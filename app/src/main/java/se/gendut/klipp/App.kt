@@ -334,9 +334,9 @@ private fun KlippAppContent(
         val c = controller ?: return
         se.gendut.klipp.engine.ExportSettings.save(context, c.currentId, settings)
         lastExportAsk = settings to name
-        // color-graded clips always become SDR (grading is done in SDR)
+        // color-graded clips always become SDR (grading is done in SDR) – except HLG made from the grades' OpenDRT
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
-        val st = if (graded) settings.copy(hdr = false) else settings
+        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.values, lookOf(grade))) it.copy(hlg = false) else it }
         // everything the export reads, taken now: the job outlives this screen (and its controller)
         val snap = c.snapshot
         val uris = c.frozenUris()
@@ -419,6 +419,7 @@ private fun KlippAppContent(
             // grading is done in SDR (8 bits, gamma) – in an HDR signal it would look wrong
             hdrBlocked = if (graded) stringResource(R.string.app_hdr_blocked) else null,
             anyTenBit = anyTen,
+            hlgReady = hlgReadyOf(gs.grades.values, lookOf(grade)),
             onDismiss = { exportAsk = false },
         ) { st, name -> exportAsk = false; runExport(st, name) }
     }
@@ -1335,6 +1336,15 @@ data class LookValues(val exposure: Float, val contrast: Float, val temp: Float,
     companion object {
         fun of(g: ColorGrade) = LookValues(g.exposure.value, g.contrast.value, g.temp.value, g.tint.value, g.sat.value, g.lutName, g.lutMix.value, g.tetra)
     }
+}
+
+/**
+ * HLG can be made from the grade: some clip is graded, every graded clip ends in OpenDRT ([ClipGrade.hlgReady]) and
+ * the timeline has no look (it would work on the HLG code values). Ungraded clips go into the file unconverted.
+ */
+fun hlgReadyOf(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): Boolean {
+    val graded = grades.filter { g -> g.chain.any { !it.isNeutral } }
+    return look.isNeutral && graded.isNotEmpty() && graded.all { it.hlgReady }
 }
 
 fun lookOf(g: ColorGrade) = se.gendut.klipp.engine.Look(
