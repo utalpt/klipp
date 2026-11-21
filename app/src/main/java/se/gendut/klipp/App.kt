@@ -420,6 +420,7 @@ private fun KlippAppContent(
             hdrBlocked = if (graded) stringResource(R.string.app_hdr_blocked) else null,
             anyTenBit = anyTen,
             hlgReady = hlgReadyOf(gs.grades.values, lookOf(grade)),
+            hlgWhyNot = hlgWhyNot(gs.grades.values, lookOf(grade)),
             onDismiss = { exportAsk = false },
         ) { st, name -> exportAsk = false; runExport(st, name) }
     }
@@ -1342,9 +1343,26 @@ data class LookValues(val exposure: Float, val contrast: Float, val temp: Float,
  * HLG can be made from the grade: some clip is graded, every graded clip ends in OpenDRT ([ClipGrade.hlgReady]) and
  * the timeline has no look (it would work on the HLG code values). Ungraded clips go into the file unconverted.
  */
-fun hlgReadyOf(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): Boolean {
+fun hlgReadyOf(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): Boolean =
+    hlgWhyNot(grades, look) == null
+
+/** Why HLG can't be made from the grade (null = it can) – shown under the export's color choices. */
+fun hlgWhyNot(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): String? {
+    if (!se.gendut.klipp.engine.EncoderCaps.hdrSupported) return "no HEVC encoder for HDR on this phone"
+    if (!look.isNeutral) return "the timeline has a look (Look tab) – it would work on the HLG values"
     val graded = grades.filter { g -> g.chain.any { !it.isNeutral } }
-    return look.isNeutral && graded.isNotEmpty() && graded.all { it.hlgReady }
+    if (graded.isEmpty()) return "no clip is graded – add an OpenDRT node to the clips"
+    val bad = graded.count { !it.hlgReady }
+    if (bad == 0) return null
+    val g = graded.first { !it.hlgReady }
+    val last = g.chain.last { !it.isNeutral }
+    val why = when {
+        last.drt == null -> "its last active node (${last.label.ifBlank { "node " + (g.chain.indexOf(last) + 1) }}) has no OpenDRT"
+        last.film != null -> "its OpenDRT node has a film"
+        last.hasKey -> "its OpenDRT node has a qualifier or window"
+        else -> "its OpenDRT node's mix is under 100%"
+    }
+    return "$bad graded clip(s) don't end in OpenDRT – e.g. $why"
 }
 
 fun lookOf(g: ColorGrade) = se.gendut.klipp.engine.Look(

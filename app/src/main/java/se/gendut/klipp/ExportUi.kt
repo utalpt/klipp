@@ -56,6 +56,8 @@ fun ExportOptions(
     /** The project's length (s): the presets show their estimated size (0 = not shown). */
     seconds: Double = 0.0,
     hlgReady: Boolean = false,
+    /** Why HLG can't be made (shown under the choices). */
+    hlgWhyNot: String? = null,
     onChange: (ExportSettings) -> Unit,
 ) {
     // the same plan the export itself follows: what is made, what is refused, what to know
@@ -188,6 +190,7 @@ fun ExportOptions(
         !hdrPossible -> stringResource(R.string.exportui_note_hdr_impossible)
         else -> stringResource(R.string.exportui_note_sdr)
     })
+    if (!s.hlg && hlgWhyNot != null) Note("HLG · OpenDRT: $hlgWhyNot")
 
         }
         else -> {
@@ -226,6 +229,7 @@ fun ExportDialog(
     caps: se.gendut.klipp.engine.EncoderInfo = se.gendut.klipp.engine.PhoneEncoders,
     /** Every graded clip ends in OpenDRT (see [ExportOptions]). */
     hlgReady: Boolean = false,
+    hlgWhyNot: String? = null,
     onDismiss: () -> Unit, onExport: (ExportSettings, String) -> Unit,
 ) {
     var s by remember { mutableStateOf(initial) }
@@ -243,7 +247,7 @@ fun ExportDialog(
                 // the same height on every tab, so the dialog stays where it is when the tab changes; the summary is always in view
                 Column(Modifier.weight(1f, fill = false).height(420.dp).verticalScroll(rememberScrollState())) {
                     TextInput(stringResource(R.string.exportui_file_name), name) { name = it.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80) }
-                    ExportOptions(s, seqW, seqH, projectFps, hdrPossible, hdrBlocked, anyTenBit, caps, seconds, hlgReady) { s = it }
+                    ExportOptions(s, seqW, seqH, projectFps, hdrPossible, hdrBlocked, anyTenBit, caps, seconds, hlgReady, hlgWhyNot) { s = it }
                 }
                 Text(
                     "${ow}×$oh · ${stringResource(R.string.exportui_fps_value, fpsLabel(plan.fps))} · ${codecName(plan.effective.codec)}" +
