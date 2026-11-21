@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -51,8 +51,8 @@ typealias LutPreview = suspend (lut: String?) -> ImageBitmap?
 
 /**
  * Klipp 17U: the LUT library as a strip of cards – each shows the current frame with that LUT ([preview]; without it,
- * the name only), grouped by the folders of the zip they were imported from. Tap = use it; hold = select several, to
- * delete them. [selected] = the LUT in use (null = none).
+ * the name only), in one strip ordered by the folders of the zip they were imported from, each group's name above its
+ * first card. Tap = use it; hold = select several, to delete them. [selected] = the LUT in use (null = none).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -68,34 +68,25 @@ fun LutBrowser(
     val builtIn = stringResource(R.string.lutbrowser_builtin)
     val imported = stringResource(R.string.lutbrowser_imported)
     fun groupLabel(n: String) = if (LutStore.isBuiltIn(n)) builtIn else LutStore.groupOf(n).ifEmpty { imported }
-    val groups = names.map(::groupLabel).distinct().sortedWith(compareBy({ it != builtIn }, { it != imported }, { it.lowercase() }))
-    // the group shown: the one of the LUT in use, else all
-    var chosen by remember { mutableStateOf(selected?.takeIf { it in names }?.let { groupLabel(it) }) }
-    // a group that no longer exists (all its LUTs deleted) shows all
-    val group = chosen?.takeIf { it in groups }
-    val shown = names.filter { group == null || groupLabel(it) == group }
+    val order = names.map(::groupLabel).distinct().sortedWith(compareBy({ it != builtIn }, { it != imported }, { it.lowercase() }))
+    // one strip, group after group; the group's name sits above its first card (no filter row: the cards are the list)
+    val shown = order.flatMap { g -> names.filter { groupLabel(it) == g } }
+    val starts = shown.indices.filter { it == 0 || groupLabel(shown[it]) != groupLabel(shown[it - 1]) }.toSet()
+    // opens at the LUT in use, with the card before it in view (the "none" card is item 0, so the LUT is index + 1)
+    val list = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = shown.indexOf(selected).coerceAtLeast(0))
     // selection for deleting (built-in LUTs can't be selected)
     var picked by remember { mutableStateOf(emptySet<String>()) }
     val selecting = picked.isNotEmpty()
     var askDelete by remember { mutableStateOf(false) }
 
     Column(modifier) {
-        // groups
-        LazyRow(
-            Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item { ToggleChip(stringResource(R.string.lutbrowser_all), group == null, { chosen = null }) }
-            items(groups) { g -> ToggleChip(g, group == g, { chosen = g }) }
-        }
-        Spacer(Modifier.height(8.dp))
         if (selecting) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.lutbrowser_selected, picked.size), color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                PillButton(stringResource(R.string.lutbrowser_select_all), { picked = picked + shown.filterNot { LutStore.isBuiltIn(it) } }, filled = false)
+                PillButton(stringResource(R.string.lutbrowser_select_all), { picked = shown.filterNot { LutStore.isBuiltIn(it) }.toSet() }, filled = false)
                 PillButton(stringResource(R.string.lutbrowser_delete), { askDelete = true }, filled = true)
                 PillButton(stringResource(R.string.lutbrowser_cancel), { picked = emptySet() }, filled = false)
             }
@@ -103,15 +94,22 @@ fun LutBrowser(
         }
         // the cards
         LazyRow(
-            Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp),
+            Modifier.fillMaxWidth(), state = list, contentPadding = PaddingValues(horizontal = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (!selecting) item(key = "\u0000none") {
-                LutCard(stringResource(R.string.colortools_none), null, selected == null, false, preview,
+                LutCard(stringResource(R.string.colortools_none), null, selected == null, false, preview, group = null,
                     onTap = { onPick(null) }, onHold = {})
             }
-            items(shown, key = { it }) { n ->
+            items(shown.size, key = { shown[it] }) { i ->
+                val n = shown[i]
                 LutCard(Str.name(LutStore.shortName(n)), n, selected == n && !selecting, n in picked, preview,
+                    group = if (i in starts) groupLabel(n) else null,
+                    // while selecting, the group's name selects (or clears) the whole group
+                    onGroup = {
+                        val all = shown.filter { groupLabel(it) == groupLabel(n) && !LutStore.isBuiltIn(it) }.toSet()
+                        if (selecting && all.isNotEmpty()) picked = if (picked.containsAll(all)) picked - all else picked + all
+                    },
                     onTap = {
                         if (selecting) { if (!LutStore.isBuiltIn(n)) picked = if (n in picked) picked - n else picked + n }
                         else onPick(n)
@@ -149,10 +147,16 @@ fun LutBrowser(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LutCard(label: String, lut: String?, on: Boolean, picked: Boolean, preview: LutPreview?, onTap: () -> Unit, onHold: () -> Unit) {
+private fun LutCard(label: String, lut: String?, on: Boolean, picked: Boolean, preview: LutPreview?, group: String?, onGroup: () -> Unit = {}, onTap: () -> Unit, onHold: () -> Unit) {
     val img by produceState<ImageBitmap?>(null, lut, preview) { value = preview?.invoke(lut) }
     val shape = RoundedCornerShape(10.dp)
     Column(Modifier.width(112.dp)) {
+        // the group's name above its first card; the other cards keep the line empty, so the row stays aligned
+        Text(
+            group ?: "", color = K.Primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+            overflow = TextOverflow.Visible,
+            modifier = Modifier.fillMaxWidth().then(if (group != null) Modifier.clickable(onClick = onGroup) else Modifier).padding(start = 2.dp, bottom = 3.dp),
+        )
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape).background(K.SurfaceHigh)
                 .then(if (on || picked) Modifier.border(2.dp, if (picked) K.Error else K.Primary, shape) else Modifier)

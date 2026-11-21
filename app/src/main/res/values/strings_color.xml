@@ -242,14 +242,13 @@
     <string name="colorpage_hsl_lum">Luminance %1$s</string>
     <string name="colorpage_hsl_pick">Pick</string>
     <string name="colorpage_pick_hint_curve">Tap the color to change on the curve</string>
-    <string name="lutbrowser_all">All</string>
     <string name="lutbrowser_builtin">Built-in</string>
     <string name="lutbrowser_imported">Imported</string>
     <string name="lutbrowser_selected">%1$d selected</string>
-    <string name="lutbrowser_select_all">All here</string>
+    <string name="lutbrowser_select_all">All imported</string>
     <string name="lutbrowser_delete">Delete</string>
     <string name="lutbrowser_cancel">Cancel</string>
     <string name="lutbrowser_delete_title">Delete %1$d LUTs?</string>
     <string name="lutbrowser_delete_text">Clips that use them keep the name and show the LUT as missing until it is imported again.</string>
-    <string name="lutbrowser_hint">Hold a LUT to select several</string>
+    <string name="lutbrowser_hint">Hold a LUT to select several (then tap a group name for the whole group)</string>
 </resources>
