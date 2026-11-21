@@ -869,9 +869,10 @@ data class ClipGrade(
     /** [main]: the main player's chain – its first effect counts the clip's frames (see [Occlusion.sawMain]). */
     fun effects(clip: Long? = null, main: Boolean = false,
                 /** The short side of the clip's original (the film's sizes in pixels follow it, see [FilmFx.Frame]); 0 = unknown. */
-                filmRef: Int = 0, clock: ((Long) -> Double?)? = null,
+                filmRef: Int = 0,
                 /** The export in HLG: the nodes' OpenDRT renders Rec.2100 HLG (see [hlgReady]). */
-                hlg: Boolean = false): List<androidx.media3.common.Effect> =
+                hlg: Boolean = false,
+                clock: ((Long) -> Double?)? = null): List<androidx.media3.common.Effect> =
         chain.filter { !it.isNeutral }.flatMapIndexed<GradeNode, androidx.media3.common.Effect> { i, n ->
             val p = n.params(hlg)
             val key = clip?.let { c -> c to n.id }
@@ -886,7 +887,7 @@ data class ClipGrade(
 
     /** Playback effects when the image up to and including node [point] comes from the node cache: the remaining nodes and the stabilization. */
     fun effectsAfter(point: Int, clip: Long?, clock: ((Long) -> Double?)?, main: Boolean = false, filmRef: Int = 0): List<androidx.media3.common.Effect> =
-        copy(nodes = nodes.drop(point + 1).ifEmpty { listOf(GradeNode(Int.MIN_VALUE)) }).effects(clip, main, filmRef, clock)
+        copy(nodes = nodes.drop(point + 1).ifEmpty { listOf(GradeNode(Int.MIN_VALUE)) }).effects(clip, main, filmRef, clock = clock)
 
     /**
      * Can be exported in HLG: the last node that colors has OpenDRT over the whole image (no qualifier or window, full
