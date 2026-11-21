@@ -1453,7 +1453,8 @@ private fun FullViewer(
         val wasLandscape = view.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         fullscreenOrientation(aspect)?.let { activity?.requestedOrientation = it }
         onDispose {
-            ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            // Klipp 17U: back to the app's own setting (full screen keeps the bars hidden)
+            if (se.gendut.klipp.Ui17u.immersive) Ui17u.applyBars(activity) else ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             if (activity != null && before != null && activity.requestedOrientation != before) {
                 // back the way the editor was: the sensor alone wouldn't turn a phone lying flat back. A moment later the
                 // earlier setting (usually: follow the sensor) applies again.

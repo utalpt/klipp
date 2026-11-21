@@ -109,8 +109,16 @@ object AppPrefs {
     fun base(c: Context): Base = runCatching { Base.valueOf(p(c).getString("base", null) ?: "") }.getOrDefault(Base.DARK)
     fun setBase(c: Context, b: Base) { p(c).edit().putString("base", b.name).apply(); K.base = b }
 
+    /** Klipp 17U: interface size (1 = Klipp's) and full screen (see [Ui17u]). */
+    fun uiScale(c: Context): Float = p(c).getFloat("uiScale17u", 0.9f).let { v -> Ui17u.SCALES.minBy { kotlin.math.abs(it - v) } }
+    fun setUiScale(c: Context, f: Float) { p(c).edit().putFloat("uiScale17u", f).apply(); Ui17u.scale = f }
+    fun immersive(c: Context): Boolean = p(c).getBoolean("immersive17u", true)
+    fun setImmersive(c: Context, on: Boolean, activity: android.app.Activity?) { p(c).edit().putBoolean("immersive17u", on).apply(); Ui17u.immersive = on; Ui17u.applyBars(activity) }
+
     /** Loads what applies to the whole app (theme, haptics) – when the app starts. */
     fun apply(c: Context) {
+        Ui17u.scale = uiScale(c)
+        Ui17u.immersive = immersive(c)
         K.customSeed = customSeed(c)
         K.accent = accent(c)
         K.base = base(c)
@@ -188,6 +196,13 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
             }
             AccentTones()
             DropField(stringResource(R.string.settings_background), Base.entries.map { Opt(it, it.label, it.hint, key = it.name) }, K.base, "base") { AppPrefs.setBase(ctx, it) }
+            // Klipp 17U: interface size and full screen
+            val sizeNames = listOf(stringResource(R.string.settings17u_size_normal), stringResource(R.string.settings17u_size_compact), stringResource(R.string.settings17u_size_small))
+            DropField(stringResource(R.string.settings17u_size), Ui17u.SCALES.mapIndexed { i, f -> Opt(f, sizeNames[i], "${(f * 100).toInt()} %", key = "ui$i") },
+                Ui17u.scale, "set:uiScale") { AppPrefs.setUiScale(ctx, it) }
+            SwitchRow(stringResource(R.string.settings17u_fullscreen), stringResource(R.string.settings17u_fullscreen_hint), Ui17u.immersive, "set:immersive") {
+                AppPrefs.setImmersive(ctx, it, ctx as? android.app.Activity)
+            }
 
                 }
                 1 -> PanelCard(Modifier.padding(top = 8.dp)) {

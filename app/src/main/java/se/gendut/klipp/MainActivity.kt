@@ -38,6 +38,12 @@ class MainActivity : ComponentActivity() {
         AppLife.starts++
     }
 
+    // Klipp 17U: full screen again when the app comes back (the system shows the bars for dialogs and other apps)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) Ui17u.applyBars(this)
+    }
+
     // the export's end is said on a screen the user sees; ended while none was resumed, it waits as a notice
     override fun onResume() {
         super.onResume()
