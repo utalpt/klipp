@@ -1,5 +1,12 @@
 # 🎬 Klipp
 
+> **This is Klipp 17U**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only) on the
+> `xiaomi-17u` branch, with features we need for Xiaomi Ultra log footage: HLG export through the grade's OpenDRT, and
+> correct levels for full-range video files without a transfer tag. It installs beside Klipp as **Klipp 17U**
+> (`x17u.klipp.editor`). What the fork changes: [CHANGELOG-17U.md](CHANGELOG-17U.md). APKs: the
+> [Releases](https://github.com/utalpt/klipp/releases) page. Issues with the fork's own features go here, not to Klipp.
+> Everything below is Klipp's own README.
+
 A multi-track video editor for Android phones, built for touch. A Kotlin/Jetpack Compose app on top of the
 [FilmCraft](https://github.com/storytold/filmcraft) editing engine (Rust, via JNI); playback and export with Media3.
 

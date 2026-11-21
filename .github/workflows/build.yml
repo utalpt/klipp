@@ -2,6 +2,7 @@ name: Build and test
 
 on:
   push:
+    branches-ignore: [hlg, xiaomi-17u]
   pull_request:
 
 jobs:

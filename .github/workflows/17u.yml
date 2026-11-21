@@ -1,0 +1,117 @@
+name: Klipp 17U
+
+# The fork's build (utalpt/klipp): the xiaomi-17u branch and the hlg test branch build the Klipp 17U APK and run the
+# fork's tests; a tag v<version> (e.g. v0.21.0-beta.1-17u.1) also publishes a signed GitHub Release.
+on:
+  push:
+    branches: [xiaomi-17u, hlg]
+    tags: ['v*-17u.*']
+  workflow_dispatch:
+
+# a new push cancels the run still going (no minutes spent on an old commit)
+concurrency:
+  group: klipp-17u-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Klipp 17U APK and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      # the NDK and CMake (~1.5 GB) from the cache after the first run
+      - uses: actions/cache@v4
+        id: ndk
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk/29.0.14206865
+            /usr/local/lib/android/sdk/cmake/3.31.6
+          key: ndk-29.0.14206865-cmake-3.31.6
+      - name: NDK and CMake
+        if: steps.ndk.outputs.cache-hit != 'true'
+        run: sdkmanager --install "ndk;29.0.14206865" "cmake;3.31.6"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      # a prebuilt cargo-ndk (seconds instead of compiling it every run)
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+      - name: Build the engine bridge
+        working-directory: rust
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
+          RUSTFLAGS="--remap-path-prefix=$HOME=~" cargo ndk -t arm64-v8a --platform 29 -o ../app/src/main/jniLibs build --release
+      # Gradle's dependencies, wrapper and build cache are kept between runs (written on the default branch)
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Version
+        id: ver
+        run: |
+          base=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts | head -1)
+          suffix=$(sed -n 's/^ *versionNameSuffix = "\(-17u\.[0-9]*\)"/\1/p' app/build.gradle.kts | head -1)
+          echo "version=$base$suffix" >> "$GITHUB_OUTPUT"
+          echo "Klipp 17U $base$suffix"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$base$suffix" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match the build's version v$base$suffix"; exit 1
+          fi
+      # the release key from the repository's secrets (Klipp's build reads it through KLIPP_KEYSTORE); without them
+      # the APK is signed with the debug key – fine for testing, refused for a release
+      - name: Release key
+        env:
+          KEYSTORE_B64: ${{ secrets.KLIPP_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.KLIPP_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KLIPP_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KLIPP_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "No release key: debug-signed APK"
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "::error::a release needs the release key"; exit 1; fi
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          { echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"; } > "$RUNNER_TEMP/keystore.properties"
+          echo "KLIPP_KEYSTORE=$RUNNER_TEMP/keystore.properties" >> "$GITHUB_ENV"
+      # the APK first (it is uploaded even if a test fails)
+      - name: Klipp 17U build
+        run: |
+          ./gradlew --build-cache assembleRelease
+          mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/Klipp-17U-${{ steps.ver.outputs.version }}.apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: klipp-17u-apk
+          path: out/*.apk
+      # the tests on debug: the Compose test rule needs debug's test activity (ui-test-manifest is debug only)
+      - name: Unit tests (OpenDRT, export plan)
+        run: ./gradlew --build-cache testDebugUnitTest --tests 'se.gendut.klipp.OpenDrtTest' --tests 'se.gendut.klipp.ExportPlanTest'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: reports
+          path: app/build/reports/tests/
+      # a tag: the GitHub Release with the APK and the version's section of CHANGELOG-17U.md
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          awk -v v="## $VERSION" '$0==v{on=1;next} /^## /{if(on)exit} on' CHANGELOG-17U.md > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then echo "::error::no '## $VERSION' section in CHANGELOG-17U.md"; exit 1; fi
+          gh release create "$GITHUB_REF_NAME" out/*.apk --title "Klipp 17U $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
