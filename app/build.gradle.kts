@@ -110,6 +110,13 @@ android {
             matchingFallbacks += "release"
         }
     }
+    // Klipp 17U (fork utalpt/klipp, branch xiaomi-17u): its own app id and name, installed beside Klipp; the version is
+    // Klipp's with the fork's release number. Kept in this one block so Klipp's own lines merge unchanged.
+    defaultConfig {
+        applicationId = "x17u.klipp.editor"
+        versionNameSuffix = "-17u.1"
+        manifestPlaceholders["appLabel"] = "Klipp 17U"
+    }
     packaging {
         // cargo ndk also copies DeepFilterNet's own cdylib (libdf-<hash>.so) into jniLibs; its code is linked into
         // libklipp_bridge.so already and nothing loads it
