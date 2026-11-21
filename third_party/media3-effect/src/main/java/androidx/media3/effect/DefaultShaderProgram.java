@@ -335,6 +335,26 @@ public final class DefaultShaderProgram extends BaseGlShaderProgram
       glProgram.setFloatsUniform("uYuvToRgbColorTransform", t[0]);
       glProgram.setFloatsUniform("uYuvOffset", t[1]);
     }
+    // Klipp color debug (test/color-debug): which sampling and conversion each input gets
+    android.util.Log.i(
+        "KlippColor",
+        "external sampler in="
+            + inputColorInfo
+            + " depth="
+            + inputColorInfo.lumaBitdepth
+            + " out="
+            + outputColorInfo
+            + " klippSdrYuv="
+            + klippSdrYuv
+            + " sdrYuv="
+            + sdrYuv
+            + " hdrIn="
+            + isInputTransferHdr
+            + " widening="
+            + isExpandingColorGamut
+            + " yuvExt="
+            + GlUtil.isYuvTargetExtensionSupported()
+            + (sdrYuv ? " offset=" + java.util.Arrays.toString(KlippYuv.transform(inputColorInfo)[1]) : ""));
     if (isInputTransferHdr) {
       // In HDR editing mode the decoder output is sampled in YUV.
       if (!GlUtil.isYuvTargetExtensionSupported()) {

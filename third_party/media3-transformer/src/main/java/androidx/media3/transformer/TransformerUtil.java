@@ -260,6 +260,13 @@ public final class TransformerUtil {
    * ColorInfo#SDR_BT709_LIMITED}.
    */
   public static ColorInfo getValidColor(@Nullable ColorInfo colorInfo) {
+    ColorInfo valid = getValidColorKlipp(colorInfo);
+    // Klipp color debug (test/color-debug)
+    android.util.Log.i("KlippColor", "getValidColor " + colorInfo + " -> " + valid);
+    return valid;
+  }
+
+  private static ColorInfo getValidColorKlipp(@Nullable ColorInfo colorInfo) {
     @Nullable ColorInfo untagged = klippUntaggedSdr(colorInfo);
     if (untagged != null) {
       return untagged;
