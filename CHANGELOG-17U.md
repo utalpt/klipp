@@ -23,6 +23,7 @@ Fixes
 
 App
 - Own app id (x17u.klipp.editor) and name (Klipp 17U): installs beside Klipp. The two apps don't share projects.
+  Version code: Klipp's x 100 + the fork's release number.
 
 Credits
 - The HLG encoding (the P3-limited Rec.2020 matrices, white point normalisation and the inverse HLG EOTF) is ported from

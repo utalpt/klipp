@@ -1,12 +1,23 @@
 name: Klipp 17U
 
-# The fork's build (utalpt/klipp): the xiaomi-17u branch and the hlg test branch build the Klipp 17U APK and run the
-# fork's tests; a tag v<version> (e.g. v0.21.0-beta.1-17u.1) also publishes a signed GitHub Release.
+# The fork's build (utalpt/klipp), as in Rawr 17U:
+# - a push to xiaomi-17u builds the APK, runs the fork's tests and republishes the `debug` prerelease, so its link stays
+#   fixed: https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
+# - a push to a test branch (hlg, …) only keeps the run's artifact. [skip tests] in the commit message only builds.
+# - an annotated tag v<Klipp's version>-17u.<N> (e.g. v0.21.0-beta.1-17u.1) publishes the signed release: the tag's
+#   message is the "What's new" (else the version's section of CHANGELOG-17U.md), then .github/release-footer.md.
+# Signed with the release key from the repository's secrets whenever it is there, so every CI APK installs over the
+# previous one and over the releases.
 on:
   push:
-    branches: [xiaomi-17u, hlg]
+    branches: [xiaomi-17u, hlg, 'test/**']
     tags: ['v*-17u.*']
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "Skip the unit tests (APK only)"
+        type: boolean
+        default: false
 
 # a new push cancels the run still going (no minutes spent on an old commit)
 concurrency:
@@ -62,11 +73,13 @@ jobs:
         id: ver
         run: |
           base=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts | head -1)
-          suffix=$(sed -n 's/^ *versionNameSuffix = "\(-17u\.[0-9]*\)"/\1/p' app/build.gradle.kts | head -1)
-          echo "version=$base$suffix" >> "$GITHUB_OUTPUT"
-          echo "Klipp 17U $base$suffix"
-          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$base$suffix" ]]; then
-            echo "::error::tag $GITHUB_REF_NAME doesn't match the build's version v$base$suffix"; exit 1
+          n=$(sed -n 's/^ *val klipp17u = \([0-9]*\)$/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$base" ] || [ -z "$n" ]; then echo "::error::version not found in app/build.gradle.kts"; exit 1; fi
+          if [ "$n" -lt 1 ] || [ "$n" -gt 99 ]; then echo "::error::the fork's release number must be 1-99"; exit 1; fi
+          echo "version=$base-17u.$n" >> "$GITHUB_OUTPUT"
+          echo "Klipp 17U $base-17u.$n"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$base-17u.$n" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match the build's version v$base-17u.$n"; exit 1
           fi
       # the release key from the repository's secrets (Klipp's build reads it through KLIPP_KEYSTORE); without them
       # the APK is signed with the debug key – fine for testing, refused for a release
@@ -92,26 +105,47 @@ jobs:
       - name: Klipp 17U build
         run: |
           ./gradlew --build-cache assembleRelease
-          mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/Klipp-17U-${{ steps.ver.outputs.version }}.apk"
+          mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/klipp17u-${{ steps.ver.outputs.version }}.apk"
       - uses: actions/upload-artifact@v7
         with:
-          name: klipp-17u-apk
+          name: klipp17u-${{ github.sha }}
           path: out/*.apk
+          retention-days: 14
       # the tests on debug: the Compose test rule needs debug's test activity (ui-test-manifest is debug only)
       - name: Unit tests (OpenDRT, export plan)
+        if: ${{ !(github.event.inputs.skip_tests == 'true' || contains(github.event.head_commit.message, '[skip tests]')) || startsWith(github.ref, 'refs/tags/') }}
         run: ./gradlew --build-cache testDebugUnitTest --tests 'se.gendut.klipp.OpenDrtTest' --tests 'se.gendut.klipp.ExportPlanTest'
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: failure()
         with:
-          name: reports
+          name: test-reports
           path: app/build/reports/tests/
-      # a tag: the GitHub Release with the APK and the version's section of CHANGELOG-17U.md
-      - name: GitHub Release
+          retention-days: 14
+      # a push to xiaomi-17u republishes the `debug` prerelease, so its download link stays the same
+      - name: Publish debug prerelease
+        if: github.event_name == 'push' && github.ref == 'refs/heads/xiaomi-17u'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/*.apk klipp17u-debug.apk
+          gh release delete debug --cleanup-tag --yes || true
+          gh release create debug klipp17u-debug.apk --prerelease --target "$GITHUB_SHA" \
+            --title "Debug build" \
+            --notes "CI build of ${GITHUB_SHA::8} (${{ steps.ver.outputs.version }}), not a release. Installs beside Klipp as Klipp 17U."
+      # a tag: the release, with the annotated tag's message (else the version's CHANGELOG-17U.md section) and the footer
+      - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          awk -v v="## $VERSION" '$0==v{on=1;next} /^## /{if(on)exit} on' CHANGELOG-17U.md > "$RUNNER_TEMP/notes.md"
-          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then echo "::error::no '## $VERSION' section in CHANGELOG-17U.md"; exit 1; fi
-          gh release create "$GITHUB_REF_NAME" out/*.apk --title "Klipp 17U $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          {
+            if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
+              git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d'
+            else
+              awk -v v="## $VERSION" '$0==v{on=1;next} /^## /{if(on)exit} on' CHANGELOG-17U.md
+            fi
+            cat .github/release-footer.md
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" out/*.apk --latest --title "Klipp 17U $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
