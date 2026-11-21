@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,14 +83,19 @@ fun LutBrowser(
 
     Column(modifier) {
         if (selecting) {
+            // the panel beside the tool rail is narrow: the count on its own line, the buttons in a row that scrolls
+            Text(
+                stringResource(R.string.lutbrowser_selected, picked.size), color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 14.dp),
+            )
+            Spacer(Modifier.height(6.dp))
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.lutbrowser_selected, picked.size), color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                PillButton(stringResource(R.string.lutbrowser_select_all), { picked = shown.filterNot { LutStore.isBuiltIn(it) }.toSet() }, filled = false)
                 PillButton(stringResource(R.string.lutbrowser_delete), { askDelete = true }, filled = true)
                 PillButton(stringResource(R.string.lutbrowser_cancel), { picked = emptySet() }, filled = false)
+                PillButton(stringResource(R.string.lutbrowser_select_all), { picked = shown.filterNot { LutStore.isBuiltIn(it) }.toSet() }, filled = false)
             }
             Spacer(Modifier.height(8.dp))
         }
