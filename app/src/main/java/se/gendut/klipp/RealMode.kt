@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -567,11 +566,14 @@ fun PlaybackSync(controller: ProjectController, playback: ProgramPlayback, state
 
 // ------------------------------------------------------------------ media panel
 
+// Klipp 17U: the files app (Storage Access Framework) instead of the photo picker – the photo picker hides the files'
+// names (a clip came in as "1000012345.mp4"); here a clip keeps its name (VID_20261121_165645.mp4) and can be picked
+// from any folder. The read permission is kept across restarts as before (takePersistableUriPermission in import).
 @Composable
 fun rememberVideoPicker(onPicked: (List<Uri>) -> Unit) =
-    rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { onPicked(it) }
+    rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { onPicked(it) }
 
-fun videoRequest() = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+fun videoRequest() = arrayOf("video/*")
 
 // ------------------------------------------------------------------ source monitor
 
