@@ -6,12 +6,10 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -137,6 +135,8 @@ private fun Workspaces(pageOf: () -> Float, modifier: Modifier, onPick: (Int) ->
     BoxWithConstraints(modifier.fillMaxHeight()) {
         val itemPx = constraints.maxWidth / MODES.size.toFloat()
         val compact = maxWidth < 280.dp
+        // Klipp 17U: every workspace shows its name (not only the current one); where the row is narrow, names only
+        val namesOnly = maxWidth < 300.dp
         val dragging = Modifier.pointerInput(itemPx) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
@@ -174,14 +174,14 @@ private fun Workspaces(pageOf: () -> Float, modifier: Modifier, onPick: (Int) ->
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MODES.forEachIndexed { i, nameId ->
-                Workspace(stringResource(nameId), MODE_ICONS[i], i == current, i == 0, i == MODES.lastIndex, compact, "modeTab:$i") { onPick(i) }
+                Workspace(stringResource(nameId), MODE_ICONS[i], i == current, i == 0, i == MODES.lastIndex, compact, namesOnly, "modeTab:$i") { onPick(i) }
             }
         }
     }
 }
 
 @Composable
-private fun Workspace(name: String, icon: ImageVector, selected: Boolean, first: Boolean, last: Boolean, compact: Boolean, tag: String, onClick: () -> Unit) {
+private fun Workspace(name: String, icon: ImageVector, selected: Boolean, first: Boolean, last: Boolean, compact: Boolean, namesOnly: Boolean, tag: String, onClick: () -> Unit) {
     val spec = spring<Dp>(0.6f, 500f)
     val l by animateDpAsState(if (selected || first) 22.dp else 8.dp, spec, label = "l")
     val r by animateDpAsState(if (selected || last) 22.dp else 8.dp, spec, label = "r")
@@ -198,14 +198,11 @@ private fun Workspace(name: String, icon: ImageVector, selected: Boolean, first:
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, name, tint = fg, modifier = Modifier.size(20.dp))
-        AnimatedVisibility(
-            selected,
-            enter = expandHorizontally(spring(0.8f, 500f)) + fadeIn(),
-            exit = shrinkHorizontally(spring(1f, 600f)) + fadeOut(),
-        ) {
-            Text(name, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 6.dp, end = 4.dp))
-        }
+        if (!namesOnly) Icon(icon, null, tint = fg, modifier = Modifier.size(20.dp))
+        Text(
+            name, color = fg, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false,
+            modifier = Modifier.padding(start = if (namesOnly) 2.dp else 6.dp, end = if (namesOnly) 2.dp else 4.dp),
+        )
     }
 }
 

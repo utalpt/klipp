@@ -189,6 +189,7 @@ class ProjectController(
             if (opened.isEmpty()) { onMessage(Str.t(R.string.projectcontroller_files_open_failed)); return@launch }
             val paths = JSONArray().apply { opened.forEach { (u, pfd, name) -> put(FdPath.of(pfd.fd, name, context.contentResolver.getType(u))) } }
             var count = 0
+            var added = 0
             editLock.withLock {
                 // the whole import (files, names, new sequence) is one undo step
                 group(Str.t(R.string.projectcontroller_undo_import)) {
@@ -218,10 +219,29 @@ class ProjectController(
                         }
                         engine.exec("file.newSequence", p)
                     }
+                    // Klipp 17U: the imported clips go straight to the end of the timeline, in name order (the camera's
+                    // names carry the date and time, so this is the order they were shot in) – no source/Insert step
+                    if (se.gendut.klipp.AppPrefs.addOnImport(context)) {
+                        val names = snap.media.associate { it.id to it.name }
+                        val ids = (0 until items.length()).map { items.getLong(it) }.sortedBy { names[it]?.lowercase() ?: "" }
+                        val now = engine.snapshot()
+                        val fps = now.fps
+                        val start = now.sequence?.duration ?: 0.0
+                        var at = start
+                        for (id in ids) {
+                            if (engine.tryExec("source.open", JSONObject().put("item", id)).isFailure) continue
+                            engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(at, fps)))
+                            if (engine.tryExec("source.insert", JSONObject()).isSuccess) added++
+                            at = engine.snapshot().sequence?.duration ?: at
+                        }
+                        // the playhead on the first new clip, so it shows in the monitor
+                        engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(start, fps)))
+                    }
                 }
                 refresh()
+                if (added > 0) state.playhead = snapshot.playhead.toFloat()
             }
-            onMessage(Str.p(R.plurals.projectcontroller_clips_imported, count, count))
+            onMessage(if (added > 0) Str.t(R.string.projectcontroller17u_added, added) else Str.p(R.plurals.projectcontroller_clips_imported, count, count))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

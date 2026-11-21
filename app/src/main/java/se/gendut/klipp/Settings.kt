@@ -109,6 +109,10 @@ object AppPrefs {
     fun base(c: Context): Base = runCatching { Base.valueOf(p(c).getString("base", null) ?: "") }.getOrDefault(Base.DARK)
     fun setBase(c: Context, b: Base) { p(c).edit().putString("base", b.name).apply(); K.base = b }
 
+    /** Klipp 17U: imported clips go straight to the end of the timeline (no source/Insert step). */
+    fun addOnImport(c: Context): Boolean = p(c).getBoolean("addOnImport17u", true)
+    fun setAddOnImport(c: Context, on: Boolean) { p(c).edit().putBoolean("addOnImport17u", on).apply() }
+
     /** Klipp 17U: interface size (1 = Klipp's) and full screen (see [Ui17u]). */
     fun uiScale(c: Context): Float = p(c).getFloat("uiScale17u", 0.9f).let { v -> Ui17u.SCALES.minBy { kotlin.math.abs(it - v) } }
     fun setUiScale(c: Context, f: Float) { p(c).edit().putFloat("uiScale17u", f).apply(); Ui17u.scale = f }
@@ -213,6 +217,10 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
             var magnet by remember { mutableStateOf(AppPrefs.magnetDefault(ctx)) }
             SwitchRow(stringResource(R.string.settings_magnet), stringResource(R.string.settings_magnet_hint), magnet, "set:magnet") {
                 magnet = it; AppPrefs.setMagnetDefault(ctx, it); onMagnetDefault(it)
+            }
+            var addImport by remember { mutableStateOf(AppPrefs.addOnImport(ctx)) }
+            SwitchRow(stringResource(R.string.settings17u_add_on_import), stringResource(R.string.settings17u_add_on_import_hint), addImport, "set:addOnImport") {
+                addImport = it; AppPrefs.setAddOnImport(ctx, it)
             }
             var vib by remember { mutableStateOf(AppPrefs.haptics(ctx)) }
             SwitchRow(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_hint), vib, "set:haptics") {

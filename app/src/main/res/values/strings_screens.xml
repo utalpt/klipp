@@ -12,6 +12,8 @@
     <string name="settings17u_size_small">Small</string>
     <string name="settings17u_fullscreen">Full screen</string>
     <string name="settings17u_fullscreen_hint">Hides the status and navigation bars. Swipe from the edge to see them for a moment.</string>
+    <string name="settings17u_add_on_import">Add imported clips to the timeline</string>
+    <string name="settings17u_add_on_import_hint">The clips go to the end of the timeline in the order they were shot, ready to edit. Off: they stay in the media panel, to place with Insert.</string>
     <string name="settings_group_timeline">Timeline</string>
     <string name="settings_center_playhead">Centered playhead</string>
     <string name="settings_center_playhead_hint">the timeline scrolls under a fixed playhead when the app starts</string>

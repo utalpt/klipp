@@ -12,6 +12,8 @@
     <string name="settings17u_size_small">Liten</string>
     <string name="settings17u_fullscreen">Helskärm</string>
     <string name="settings17u_fullscreen_hint">Döljer status- och navigeringsfälten. Svep från kanten för att se dem en stund.</string>
+    <string name="settings17u_add_on_import">Lägg importerade klipp på tidslinjen</string>
+    <string name="settings17u_add_on_import_hint">Klippen hamnar i slutet av tidslinjen i den ordning de spelades in, redo att redigera. Av: de stannar i mediapanelen, att placera med Infoga.</string>
     <string name="settings_group_timeline">Tidslinje</string>
     <string name="settings_center_playhead">Spelhuvudet i mitten</string>
     <string name="settings_center_playhead_hint">tidslinjen rullar under ett fast spelhuvud när appen startar</string>
