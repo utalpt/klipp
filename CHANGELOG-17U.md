@@ -24,6 +24,9 @@ Color and export
 - A new project's frame rate from a phone clip snaps to the nearest standard rate within 4 % (60, 120 and the other
   usual rates): a 60 fps clip whose variable rate averaged 58.6 made a 58.598 fps project, which dropped frames on export.
   The NTSC rates (59.94 …) only when the file really is on one.
+- HLG / Dolby Vision from the grade: ungraded clips, titles and captions are no longer written as SDR values into the
+  HDR file. They are converted after ITU-R BT.2408 (BT.709 → BT.2020, SDR white at the 203 cd/m² reference, 75 % HLG),
+  so they sit at the right brightness and colour next to the graded clips (the known issue of #6 in Klipp's alpha 233).
 - Export → Dolby Vision · keep HDR: Dolby Vision clips (their HLG base) cut and edited without a grade come out as
   Dolby Vision again, with new dynamic metadata made by the phone's encoder from the exported frames.
 - Export → Quality: bitrates above the encoder's listed limit (on by default, "Above it (Klipp Lab)"). The phone's

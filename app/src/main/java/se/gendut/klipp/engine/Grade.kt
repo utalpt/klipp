@@ -427,6 +427,8 @@ data class GradeNode(
     val filmOff: Film? = null,
     /** Klipp Lab: only in the clip's input node ([ClipGrade.chain]): the EI rating, as the node's curves. */
     val inputEi: InputEi? = null,
+    /** Klipp Lab: only in the HLG export, after an ungraded clip: its SDR picture as HLG ([SdrHlg]). */
+    val sdrToHlg: Boolean = false,
 ) {
     val hasLog get() = !(logShadow.isNeutral && logMid.isNeutral && logHi.isNeutral)
     val hasCurves get() = !(curveY.isIdentity && curveR.isIdentity && curveG.isIdentity && curveB.isIdentity)
@@ -436,7 +438,7 @@ data class GradeNode(
     val hasKey get() = qual.on || win.on
     val hasBlur get() = blur > 0.0001f || pixelate > 0.0001f || denoise > 0.0001f
     val isNeutral get() = !enabled || mix <= 0.0001f || (lift.isNeutral && gamma.isNeutral && gain.isNeutral && offset.isNeutral &&
-        contrast == 1f && sat == 1f && density == 0f && hue == 0f && temp == 0f && tint == 0f && !hasCurves && !hasLog && !hasHsl && !hasLut && !hasBlur && drt == null && film == null && inputEi?.active != true)
+        contrast == 1f && sat == 1f && density == 0f && hue == 0f && temp == 0f && tint == 0f && !hasCurves && !hasLog && !hasHsl && !hasLut && !hasBlur && drt == null && film == null && inputEi?.active != true && !sdrToHlg)
 
     /** Uniform values (shared by the CPU path and the shader). */
     class Params(
@@ -514,8 +516,8 @@ data class GradeNode(
         } else null
         val base = if (hasLut) lut?.let { runCatching { LutStore.get(it) }.getOrNull() } else null
         // with OpenDRT: the node's LUT (with its mix) and the transform in one single LUT, fully on
-        val l2 = drt?.let { d -> runCatching { OpenDrt.composite(base, lutMix, d, hlg) }.getOrNull() } ?: base
-        val l2Mix = if (drt != null && l2 !== base) 1f else lutMix.coerceIn(0f, 1f)
+        val l2 = if (sdrToHlg) SdrHlg.lut else drt?.let { d -> runCatching { OpenDrt.composite(base, lutMix, d, hlg) }.getOrNull() } ?: base
+        val l2Mix = if (sdrToHlg) 1f else if (drt != null && l2 !== base) 1f else lutMix.coerceIn(0f, 1f)
         // the film is applied after the node on the whole image (grain, halation and diffusion need the neighbors – it
         // doesn't fit in the node's LUT). The tables are prepared here (FilmEditor computes the parameters on a background thread).
         val f = film?.takeIf { fl -> runCatching { FilmFx.warm(fl) }.onFailure { se.gendut.klipp.CrashReport.note("spektrafilm: ${it.message}") }.isSuccess }

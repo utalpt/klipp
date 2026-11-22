@@ -196,7 +196,7 @@ fun ExportOptions(
     }
     Note(when {
         s.hlg && s.dolby -> "Dolby Vision 8.4: the HLG (Rec.2100, 1000 nits) of each clip's last OpenDRT node, encoded by the phone's Dolby Vision encoder, which makes the dynamic metadata from the exported frames. Plays as HLG where there is no Dolby Vision. The preview stays SDR."
-        s.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; 10-bit HEVC. The preview stays SDR."
+        s.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; ungraded clips, titles and captions are converted from SDR (BT.2408, white at 75 %). 10-bit HEVC. The preview stays SDR."
         s.hdr && s.dolby -> "Dolby Vision from the clips' own HDR (a Dolby Vision clip's HLG base, cut and edited without a grade), encoded by the phone's Dolby Vision encoder, which makes new dynamic metadata from the exported frames."
         s.hdr -> stringResource(R.string.exportui_note_hdr)
         hdrBlocked != null -> hdrBlocked
