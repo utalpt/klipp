@@ -45,10 +45,15 @@ data class ExportSettings(
     val bitDepth: Int = 0,
     val hlg: Boolean = false,
     val dolby: Boolean = false,
+    /**
+     * Klipp Lab: the bitrate goes to the encoder as chosen, above the range it lists (the 17 Ultra's Dolby Vision encoder
+     * lists 160 Mbit/s and takes 200-240) – see KlippEncoderLimits.
+     */
+    val uncapped: Boolean = true,
 ) {
     fun toJson(): JSONObject = JSONObject().put("h", height).put("fps", fps).put("codec", codec).put("mbps", bitrateMbps.toDouble())
         .put("cbr", cbr).put("key", keyframeSec.toDouble()).put("high", highProfile).put("hdr", hdr)
-        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg).put("dv", dolby)
+        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg).put("dv", dolby).put("uncap", uncapped)
 
     /** Output frame size for a [w]×[h] project (even dimensions, as encoders require). */
     fun outputSize(w: Int, h: Int): Pair<Int, Int> {
@@ -94,6 +99,7 @@ data class ExportSettings(
                 o.optInt("bits", 0).let { if (it == 8 || it == 10) it else 0 },
                 o.optBoolean("hlg", false),
                 o.optBoolean("dv", false),
+                o.optBoolean("uncap", true),
             )
         }
 

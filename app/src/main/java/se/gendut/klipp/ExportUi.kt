@@ -155,11 +155,16 @@ fun ExportOptions(
             else -> { custom = false; onChange(s.copy(bitrateMbps = levels[v].toFloat())) }
         }
     }
-    if (qSel == CUSTOM_Q) PropSlider(stringResource(R.string.exportui_mbps_unit), if (s.bitrateMbps > 0f) s.bitrateMbps else levels[ExportPresets.STANDARD].toFloat(), 1f, 200f, levels[ExportPresets.STANDARD].toFloat(),
+    if (qSel == CUSTOM_Q) PropSlider(stringResource(R.string.exportui_mbps_unit), if (s.bitrateMbps > 0f) s.bitrateMbps else levels[ExportPresets.STANDARD].toFloat(), 1f, 300f, levels[ExportPresets.STANDARD].toFloat(),
         { "%.0f".format(it) }, "expBitrate", lane = false) { onChange(s.copy(bitrateMbps = Math.round(it).toFloat())) }
     Chips {
         Choice(stringResource(R.string.exportui_vbr), !s.cbr, true, "exp:vbr") { onChange(s.copy(cbr = false)) }
         Choice(stringResource(R.string.exportui_cbr), s.cbr, true, "exp:cbr") { onChange(s.copy(cbr = true)) }
+    }
+    // Klipp Lab: the encoders list a lower bitrate than they take (Dolby Vision: 160 listed, 200-240 recorded)
+    Chips {
+        Choice("Encoder's listed limit", !s.uncapped, true, "exp:capped") { onChange(s.copy(uncapped = false)) }
+        Choice("Above it (Klipp Lab)", s.uncapped, true, "exp:uncapped") { onChange(s.copy(uncapped = true)) }
     }
 
     val keyAutoHint = stringResource(R.string.exportui_keyframe_auto_hint)
@@ -249,7 +254,7 @@ fun ExportDialog(
     // Klipp Lab: the bitrate as the encoder takes it (Media3 clamps it to the encoder's highest, see EncoderCaps.maxMbps)
     val capMbps = remember(plan.effective.codec) { se.gendut.klipp.engine.EncoderCaps.maxMbps(plan.effective.codec) }
     val askedMbps = plan.effective.videoMbps(seqW, seqH, projectFps)
-    val realMbps = capMbps?.let { minOf(askedMbps, it) } ?: askedMbps
+    val realMbps = if (plan.effective.uncapped) askedMbps else capMbps?.let { minOf(askedMbps, it) } ?: askedMbps
     val mb = plan.effective.copy(bitrateMbps = realMbps.toFloat()).estimateMb(seqW, seqH, projectFps, seconds)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -264,7 +269,7 @@ fun ExportDialog(
                 Text(
                     "${ow}×$oh · ${stringResource(R.string.exportui_fps_value, fpsLabel(plan.fps))} · ${codecName(plan.effective.codec)}" +
                         (if (plan.hlg && plan.effective.dolby) "" else if (plan.hlg) " HLG" else if (plan.hdr) " HDR" else if (plan.tenBit) " 10-bit" else "") + " · " +
-                        (if (s.bitrateMbps > 0f) mbpsLabel(realMbps) + (if (realMbps < askedMbps - 0.5) " (max)" else "") else stringResource(R.string.exportui_auto_lower)) + " · ≈ ${sizeLabel(mb)}",
+                        (if (s.bitrateMbps > 0f) mbpsLabel(realMbps) + (if (realMbps < askedMbps - 0.5) " (max)" else if (capMbps != null && realMbps > capMbps + 0.5) " (listed ${"%.0f".format(capMbps)})" else "") else stringResource(R.string.exportui_auto_lower)) + " · ≈ ${sizeLabel(mb)}",
                     color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).testTag("exp:summary"),
                 )

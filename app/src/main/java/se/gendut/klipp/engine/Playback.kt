@@ -1519,6 +1519,8 @@ object Exporter {
     /** The encoders' settings from [st]: bitrate, CBR/VBR, keyframes, profile, audio bitrate. */
     private fun encoderFactory(context: Context, st: ExportSettings, tenBit: Boolean = false): androidx.media3.transformer.DefaultEncoderFactory {
         val v = androidx.media3.transformer.VideoEncoderSettings.Builder()
+        // Klipp Lab: the chosen bitrate above the encoder's listed range (ExportSettings.uncapped)
+        androidx.media3.transformer.KlippEncoderLimits.ignoreBitrateCap = st.uncapped
         if (st.bitrateMbps > 0f) v.setBitrate((st.bitrateMbps * 1_000_000).toInt())
         v.setBitrateMode(if (st.cbr) android.media.MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR else android.media.MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
         if (st.keyframeSec > 0f) v.setiFrameIntervalSeconds(st.keyframeSec)

@@ -639,8 +639,11 @@ public final class DefaultEncoderFactory implements Codec.EncoderFactory {
     }
 
     MediaCodecInfo pickedEncoderInfo = filteredEncoderInfos.get(0);
+    // Klipp Lab: above the listed range when asked (KlippEncoderLimits)
     int closestSupportedBitrate =
-        EncoderUtil.getSupportedBitrateRange(pickedEncoderInfo, mimeType).clamp(requestedBitrate);
+        KlippEncoderLimits.ignoreBitrateCap
+            ? max(1, requestedBitrate)
+            : EncoderUtil.getSupportedBitrateRange(pickedEncoderInfo, mimeType).clamp(requestedBitrate);
     settingsBuilder.setBitrate(closestSupportedBitrate);
     encoderSupportedFormatBuilder.setAverageBitrate(closestSupportedBitrate);
 
