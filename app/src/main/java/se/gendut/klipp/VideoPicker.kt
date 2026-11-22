@@ -151,7 +151,7 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
         }
         val list = videos
         when {
-            // Klipp Lab: MotionCam RAW (its own folder, developed to S-Log3 on import)
+            // Klipp Lab: MotionCam RAW (its own folder, developed into the chosen log on import)
             folder == MCRAW_FOLDER -> {
                 LazyRow(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item { ToggleChip(all, false, { folder = null }) }

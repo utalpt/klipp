@@ -117,7 +117,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
     DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out") { outKey = it; McrawFolder17u.setOut(ctx, it) }
     if (tree == null) {
         Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Pick MotionCam's folder once (usually Documents/MotionCam): its .mcraw files show here, developed to S-Log3 when imported.",
+            Text("Pick MotionCam's folder once (usually Documents/MotionCam): its .mcraw files show here, developed into the log chosen above when imported.",
                 color = K.OnSurfaceVar, fontSize = 15.sp)
             PillButton("Choose folder", { pickFolder.launch(startAt) }, filled = true, modifier = Modifier.testTag("mcraw:folder"))
         }
