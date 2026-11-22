@@ -40,6 +40,7 @@
 - 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – proxies, node cache, renders,
   each with its Clear, plus Clear caches – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off);
   opening a project then says what each kind takes.
+- 🎓 **Grading for beginners** (Settings): the fundamental steps from log footage to a finished image.
 - ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
   size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in

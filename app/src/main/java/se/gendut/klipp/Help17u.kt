@@ -208,3 +208,35 @@ object Help17uText {
         "Develop (below) puts it into the develop, where clipped highlights stay white."
     const val TINT = "Green (−) to magenta (+), in the linear light before the nodes. Double tap: back to 0."
 }
+
+/** Klipp Lab: Settings → Grading for beginners – the fundamental steps, from log footage to a finished image. */
+@Composable
+fun Grading17uGuide() {
+    val steps = listOf(
+        "1 · The clip's input (the EI chip, before the nodes)" to
+            "Say how the clip was shot: its log curve (e.g. S-Log3) and, if you know it, the EI. White balance here works " +
+            "like a raw developer's. MotionCam clips: the develop's EI and output are here too.",
+        "2 · Node 1 – correct" to
+            "Get the base right. Offset moves everything up or down – in log, that's exposure. Lift sets the darks, Gain " +
+            "the brights, Gamma the midtones. White balance (the dropper): tap something that should be white or grey.",
+        "3 · Node 2 – the look (optional)" to
+            "The creative part: curves, saturation, the Qualifier to change one colour only (skin, sky). A creative LUT " +
+            "that works in log goes here too. Add a node with +.",
+        "4 · Last node – OpenDRT" to
+            "LUT tab → OpenDRT On. It turns the log into the finished image, so it is always the last node, on the whole " +
+            "picture, mix 100 %. Its Looks (Arriba, Sylvan, Colorful…) give a style without a LUT.",
+        "5 · Export" to
+            "SDR or HLG – the same nodes work for both. For HLG, MotionCam clips get OpenDRT on their own if they lack it.",
+        "Careful with LUTs" to
+            "A LUT that converts log to Rec.709 does OpenDRT's job: both together convert twice (too much contrast and " +
+            "colour). Test a LUT alone: if the flat picture turns 'normal', it's a conversion LUT – use it instead of " +
+            "OpenDRT, not with it (SDR only).",
+        "Tip" to "Hold any control for a moment to see what it does.",
+    )
+    for ((title, text) in steps) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(title, color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = K.OnSurfaceVar, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
