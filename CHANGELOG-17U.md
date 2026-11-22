@@ -76,7 +76,8 @@ Import and timeline
 - MCRAW Auto EI (now the default, in the picker and the RAW settings): measures the clip's middle frame and picks
   the EI (one-third stops, 100–3200) that brings its average to 18 % grey – for import-and-export without choosing.
 - Long-press help across the app: holding a control still explains what it does – the sliders (by their name),
-  drop-down fields and dock actions with a help text: Color (primaries, Log ranges, qualifier, window, LUT, OpenDRT
+  drop-down fields, dock actions, the tool rails, and on the Color page the EI chip, + node, Compare, Scope, the
+  wheel modes and ranges, White balance and Copy grade: Color (primaries, Log ranges, qualifier, window, LUT, OpenDRT
   grey, film), the clip's input and white balance, MotionCam RAW, Properties (transform, crop, key, mask), Export,
   the project and Settings fields, and the timeline's actions. A tap or a drag works as before (the controls take it
   as their own long click, as Android's). (English for now.)

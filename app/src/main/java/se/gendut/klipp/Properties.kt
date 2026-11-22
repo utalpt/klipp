@@ -408,6 +408,7 @@ internal fun SheetHeader(title: String, subtitle: String? = null, onDone: () -> 
  * so that half a tool shows at the edge (and fades): there is more. The selected one is kept in view.
  * [dense] = the color page's rail: the tools close together, the selected one's name in the text color.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ToolRail(tabs: List<ToolTab>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, dense: Boolean = false) {
     val haptics = rememberHaptics()
@@ -430,7 +431,8 @@ internal fun ToolRail(tabs: List<ToolTab>, selected: Int, onSelect: (Int) -> Uni
                 val name by animateColorAsState(if (on && dense) K.OnSurface else if (on) K.PrimarySoft else K.OnSurfaceVar, label = "rn")
                 Column(
                     Modifier.width(76.dp).height(each).inViewWhen(on, each / 2, horizontal = false)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { if (!on) haptics.tick(); onSelect(i) }
+                        .androidx.compose.foundation.combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab,
+                            onLongClick = onLongHelp17u(t.label, Help17uText.of(t.tag))) { if (!on) haptics.tick(); onSelect(i) }
                         .semantics { this.selected = on }
                         .testTag(t.tag),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
