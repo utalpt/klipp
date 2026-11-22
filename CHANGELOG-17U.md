@@ -70,6 +70,9 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MCRAW white balance in the develop: on a MotionCam clip, Develop puts the white balance set live in the clip's input
+  into the develop – as camera gains on the raw, before the demosaic and the neutral highlight clip, so clipped
+  highlights stay white – and the live one goes back to As shot. Kept through later develops (EI, output).
 - MCRAW Auto EI (now the default, in the picker and the RAW settings): measures the clip's middle frame and picks
   the EI (one-third stops, 100–3200) that brings its average to 18 % grey – for import-and-export without choosing.
 - Long-press help across the app: holding a control still explains what it does – the sliders (by their name),

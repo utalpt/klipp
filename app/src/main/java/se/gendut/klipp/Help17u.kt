@@ -135,11 +135,14 @@ object Help17uText {
         "Pick the one your LUTs or your grading habits expect. It is not the export's format: Rec.709, HLG or PQ are " +
         "chosen when exporting, from any of these."
     const val DEVELOP = "Develops the .mcraw again with these settings, in the background (about 1.5–2× the clip's length). " +
+        "A white balance set live above goes into the develop, on the raw before the highlights are clipped (clipped " +
+        "highlights stay white), and the live one goes back to As shot. " +
         "The clip switches to the new develop when it is done and keeps its grade; its input and OpenDRT nodes follow " +
         "the new curve. The old develop is removed when no project uses it."
     const val RAW = "This clip is a develop of a MotionCam .mcraw. The EI and the output are baked into the develop and " +
         "can be changed here at any time (a new develop). White balance and the rated EI above are live, on top of it."
     const val TEMP = "White balance in the linear light, before the nodes, as in a raw developer. As shot = the clip as it " +
-        "is. Lower K = the light was warmer = a cooler picture. Double tap: back to as shot."
+        "is. Lower K = the light was warmer = a cooler picture. Double tap: back to as shot. On a MotionCam clip, " +
+        "Develop (below) puts it into the develop, where clipped highlights stay white."
     const val TINT = "Green (−) to magenta (+), in the linear light before the nodes. Double tap: back to 0."
 }

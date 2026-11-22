@@ -63,28 +63,33 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
         val g = gs.of(current.id)
         if ((g.ei?.input ?: OpenDrt.Input.SLOG3.key) != i.out) gs.set(current.id, followDevelop(g, i.ei, i.out), record = false)
     }
-    val changed = (if (ei == 0) !i.auto else ei != i.ei || i.auto) || out != i.out
+    // the white balance set live in the clip's input goes into the develop (on the raw, before the highlights are
+    // clipped neutral), and the live one goes back to as shot
+    val liveWb = gs.of(current.id).ei?.takeIf { it.hasWb }
+    val changed = (if (ei == 0) !i.auto else ei != i.ei || i.auto) || out != i.out || liveWb != null
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(working ?: msg ?: if (changed) "Not developed yet" else "",
+        Text(working ?: msg ?: if (liveWb != null) "Develop puts the white balance into the develop" else if (changed) "Not developed yet" else "",
             color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
         FlatTextButton(onClick = {
             val old = current.uri ?: return@FlatTextButton
             val ids = clips.filter { it.uri == old }.map { it.id }.ifEmpty { listOf(current.id) }
             val newEi = ei; val newOut = out
             msg = null
-            McrawStore17u.redevelop(ctx, old, i, newEi, newOut) { uri, summary ->
+            McrawStore17u.redevelop(ctx, old, i, newEi, newOut, liveWb?.let { it.input to it.wbGains() }) { uri, summary ->
                 if (uri == null) { msg = "Not developed: ${summary.lineSequence().firstOrNull() ?: ""}"; return@redevelop }
                 msg = "Developed at ${McrawFolder17u.eiLabel(newEi)} into ${OpenDrt.Input.of(newOut).label}"
                 // the clip's input follows the develop: its curve, and the EI it was shot at (the rating stays)
-                gs.setAll(ids.associateWith { id -> followDevelop(gs.of(id), newEi, newOut) })
+                gs.setAll(ids.associateWith { id -> followDevelop(gs.of(id), newEi, newOut, bakedWb = liveWb != null) })
             }
         }, enabled = changed && working == null, modifier = Modifier.testTag("raw:develop")) { Text("Develop") }
     }
 }
 
 /** A clip's grade with its input following a develop at [ei] into [out]: the curve, and the shot EI (the rating stays). */
-private fun followDevelop(g: se.gendut.klipp.engine.ClipGrade, ei: Int, out: String): se.gendut.klipp.engine.ClipGrade {
-    val e = g.ei ?: se.gendut.klipp.engine.InputEi()
+private fun followDevelop(g: se.gendut.klipp.engine.ClipGrade, ei: Int, out: String, bakedWb: Boolean = false): se.gendut.klipp.engine.ClipGrade {
+    val e0 = g.ei ?: se.gendut.klipp.engine.InputEi()
+    // a white balance put into the develop is no longer applied live
+    val e = if (bakedWb) e0.copy(temp = 0, tint = 0) else e0
     return g.copy(
         ei = e.copy(input = out, shot = if (e.shot > 0 && ei > 0) ei else e.shot).takeIf { it.shot > 0 || it.hasWb || it.input != OpenDrt.Input.SLOG3.key },
         // OpenDRT nodes read the clip's curve and gamut from their input

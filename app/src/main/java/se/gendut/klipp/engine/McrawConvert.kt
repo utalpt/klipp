@@ -89,7 +89,8 @@ object McrawConvert {
         }
     }
 
-    class Result(val uri: Uri?, val summary: String, val log: String)
+    /** [camWb]: the white balance the develop was made with, as gains on the camera's channels over as shot. */
+    class Result(val uri: Uri?, val summary: String, val log: String, val camWb: FloatArray? = null)
 
     /**
      * [draft]: half size, each 2×2 CFA block one pixel (no demosaic) – a quick develop for playback; the full one is
@@ -100,7 +101,12 @@ object McrawConvert {
      * EI to develop at (else the picker's setting).
      */
     fun convert(ctx: Context, src: Uri, draft: Boolean = false, outFile: java.io.File? = null, ei: Int? = null,
-                out: String = OpenDrt.Input.SLOG3.key, progress: (Float) -> Unit): Result {
+                out: String = OpenDrt.Input.SLOG3.key,
+                /** White balance already in a develop: camera gains over as shot (see [Result.camWb]). */
+                camWb: FloatArray? = null,
+                /** White balance to bake in on top: gains on a log gamut's primaries (gamut key, gains) – as the clip's input. */
+                liveWb: Pair<String, FloatArray>? = null,
+                progress: (Float) -> Unit): Result {
         val outIn = OpenDrt.Input.of(out)
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
@@ -142,6 +148,8 @@ object McrawConvert {
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff, outIn.gamut)
             line("cfa $cfa  camera → ${outIn.label}: ${camToOut.joinToString { "%.4f".format(it) }}")
+            val wbCam = cameraWb(c, ff, camWb, liveWb)
+            if (wbCam.any { kotlin.math.abs(it - 1f) > 1e-4f }) line("white balance over as shot (camera R G B): ${wbCam.joinToString { "%.4f".format(it) }}")
 
             // output file: the given one (written as .part, renamed when done), else in Movies/Klipp Lab
             val base = name.substringBeforeLast('.')
@@ -239,6 +247,7 @@ object McrawConvert {
                 val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
                     gl.setup(cfa, c, camToOut, headroom(ei), draft, outIn.oetf)
+                    gl.wbCam = wbCam
                     for (k in 0 until n) {
                         val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
@@ -267,7 +276,7 @@ object McrawConvert {
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
                 (outFile?.name ?: "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4") + " – " + "${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input ${outIn.label}, developed at EI $ei."
-            return Result(outUri, summary, log.toString())
+            return Result(outUri, summary, log.toString(), wbCam)
         } catch (e: Throwable) {
             line("error: $e")
             if (outFile != null) runCatching { java.io.File(outFile.path + ".part").delete() }
@@ -392,6 +401,30 @@ object McrawConvert {
     }
 
     private fun mul(a: FloatArray, b: FloatArray) = FloatArray(9) { i -> val r = i / 3; val k = i % 3; a[r * 3] * b[k] + a[r * 3 + 1] * b[3 + k] + a[r * 3 + 2] * b[6 + k] }
+    /**
+     * Klipp Lab: the white balance on the camera's channels, before the demosaic and the neutral highlight clip (so
+     * clipped highlights stay white): [base] (a develop's) times the gains [live] sets on a log gamut's primaries,
+     * turned into camera gains – the camera colour those gains make neutral becomes neutral. Luminance is kept.
+     */
+    private fun cameraWb(c: JSONObject, ff: JSONObject, base: FloatArray?, live: Pair<String, FloatArray>?): FloatArray {
+        val b = base?.takeIf { it.size == 3 } ?: floatArrayOf(1f, 1f, 1f)
+        val (key, g) = live ?: return b
+        if (g.size != 3 || g.all { kotlin.math.abs(it - 1f) < 1e-4f }) return b
+        val gamut = OpenDrt.Input.of(key).gamut
+        val m = colorMatrix(c, ff, gamut)
+        val mi = inv(m)
+        val target = FloatArray(3) { 1f / g[it].coerceAtLeast(1e-4f) }
+        val cam = FloatArray(3) { r -> mi[r * 3] * target[0] + mi[r * 3 + 1] * target[1] + mi[r * 3 + 2] * target[2] }
+        val adj = FloatArray(3) { 1f / cam[it].coerceAtLeast(1e-4f) }
+        // luminance of a grey before and after (the gamut's Y row)
+        fun y(v: FloatArray): Float {
+            val o = FloatArray(3) { r -> m[r * 3] * v[0] + m[r * 3 + 1] * v[1] + m[r * 3 + 2] * v[2] }
+            return gamut[3] * o[0] + gamut[4] * o[1] + gamut[5] * o[2]
+        }
+        val k = y(floatArrayOf(1f, 1f, 1f)) / y(adj).coerceAtLeast(1e-6f)
+        return FloatArray(3) { b[it] * adj[it] * k }
+    }
+
     private fun inv(m: FloatArray): FloatArray {
         val a = m[0]; val b = m[1]; val c = m[2]; val d = m[3]; val e = m[4]; val f = m[5]; val g = m[6]; val h = m[7]; val i = m[8]
         val det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
@@ -411,6 +444,8 @@ object McrawConvert {
         var rawTex = 0
         var shadeTex = 0
         var curveTex = 0
+        /** Camera white balance over as shot ([cameraWb]). */
+        var wbCam = floatArrayOf(1f, 1f, 1f)
         var shadeW = 0; var shadeH = 0
         // the CFA: colour (0 R, 1 G, 2 B) and shading-map channel (0 R, 1 G even, 2 G odd, 3 B) at each 2×2 position
         val colorAt = IntArray(4); val shadeAt = IntArray(4)
@@ -499,7 +534,7 @@ object McrawConvert {
             // white balance per colour from the as-shot neutral (green = 1)
             val ns = meta.optJSONArray("asShotNeutral")
             val neutral = if (ns != null && ns.length() >= 3) FloatArray(3) { ns.getDouble(it).toFloat() } else floatArrayOf(1f, 1f, 1f)
-            val gains = FloatArray(3) { neutral[1] / neutral[it].coerceAtLeast(1e-4f) }
+            val gains = FloatArray(3) { neutral[1] / neutral[it].coerceAtLeast(1e-4f) * wbCam[it] }
             GLES30.glUniform3f(loc("wb"), gains[0], gains[1], gains[2])
             GLES30.glUniform1f(loc("clipAt"), gains.min())
 
