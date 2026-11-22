@@ -70,6 +70,9 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- White balance in the clip's input (Color → the EI chip): Temperature (2000–12000 K, "As shot" in the middle) and
+  Tint, applied in the linear light on the clip's own primaries before every node – as a raw developer's, live while
+  dragging. Works on any log clip; for a MotionCam develop it moves away from the as-shot white. The chip shows "· WB".
 - Storage warning: Settings → Playback → "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (20 by default, or
   off) – opening a project then says how much the proxies, cache, renders, MCRAW develops and freeze frames take.
 - MCRAW: Malvar–He–Cutler demosaic (gradient-corrected, 5×5) in place of the plain bilinear one – sharper fine

@@ -553,7 +553,7 @@ private fun NodeRow(
                     ei == null || ei.shot <= 0 -> "EI"
                     ei.rated > 0 && ei.rated != ei.shot -> "EI ${ei.shot}→${ei.rated}"
                     else -> "EI ${ei.shot}"
-                }
+                } + if (ei?.hasWb == true) " · WB" else ""
                 val eiSrc = remember { MutableInteractionSource() }
                 Box(
                     Modifier.pressPop(eiSrc, 0.92f).height(44.dp).clip(RoundedCornerShape(14.dp))
@@ -794,7 +794,9 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
     val g = gs.of(current.id)
     // (the curve: the clip's own, else the first OpenDRT node's, else S-Log3)
     val ei = g.ei ?: se.gendut.klipp.engine.InputEi(g.nodes.firstNotNullOfOrNull { it.drt }?.input ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key)
-    fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = e.takeIf { it.shot > 0 }))
+    fun keep(e: se.gendut.klipp.engine.InputEi) = e.takeIf { it.shot > 0 || it.hasWb }
+    fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = keep(e)))
+    fun live(e: se.gendut.klipp.engine.InputEi) = gs.setLive(current.id, (gs.shown(current.id) ?: g).copy(ei = keep(e)))
     Text(stringResource(R.string.colorpage_input_title), color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp))
     Text(stringResource(R.string.colorpage_input_intro), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
     val inputs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
@@ -817,6 +819,17 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
             color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
         )
     }
+    // Klipp Lab: white balance in the linear light, before the nodes (as a raw developer's; see InputEi.wbGains)
+    Text(stringResource(R.string.colorpage17u_wb_note), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp))
+    val asShot = stringResource(R.string.colorpage17u_wb_as_shot)
+    val ref = se.gendut.klipp.engine.InputEi.WB_REF.toFloat()
+    fun kOf(v: Float) = ((v / 50f).roundToInt() * 50).let { if (it == ref.toInt()) 0 else it }
+    PropSlider(stringResource(R.string.colorpage17u_wb_temp), if (ei.temp > 0) ei.temp.toFloat() else ref, 2000f, 12000f, ref,
+        { kOf(it).let { k -> if (k == 0) asShot else "$k K" } }, "clipInput:temp", lane = false,
+        onLive = { live(ei.copy(temp = kOf(it))) }) { set(ei.copy(temp = kOf(it))) }
+    PropSlider(stringResource(R.string.colorpage17u_wb_tint), ei.tint.toFloat(), -100f, 100f, 0f,
+        { "%+d".format(it.roundToInt()) }, "clipInput:tint", lane = false,
+        onLive = { live(ei.copy(tint = it.roundToInt())) }) { set(ei.copy(tint = it.roundToInt())) }
     if (g.ei != null && clips.size > 1) ToggleChip(stringResource(R.string.colorpage_input_all), false, {
         haptics.confirm()
         gs.setAll(clips.filter { it.id != current.id }.associate { it.id to gs.of(it.id).copy(ei = g.ei) })
