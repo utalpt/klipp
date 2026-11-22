@@ -75,7 +75,8 @@ Import and timeline
 - Long-press help across the app: holding a control still explains what it does – the sliders (by their name),
   drop-down fields and dock actions with a help text: Color (primaries, Log ranges, qualifier, window, LUT, OpenDRT
   grey, film), the clip's input and white balance, MotionCam RAW, Properties (transform, crop, key, mask), Export,
-  the project and Settings fields, and the timeline's actions. A tap or a drag works as before. (English for now.)
+  the project and Settings fields, and the timeline's actions. A tap or a drag works as before (the controls take it
+  as their own long click, as Android's). (English for now.)
 - MotionCam RAW settings, changeable at any time (Color → the EI chip → MotionCam RAW): "Develop at EI" and Output
   (any of Klipp's log curves and gamuts – S-Log3 / S-Gamut3.Cine, LogC3/LogC4, V-Log, DaVinci Intermediate, ACEScct …).
   Develop makes a new develop from the .mcraw in the background; the clip switches to it when done, keeps its grade,

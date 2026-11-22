@@ -46,13 +46,13 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
     var msg by remember { mutableStateOf<String?>(null) }
     val working = McrawStore17u.working
     Text("MotionCam RAW", color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.help17u("MotionCam RAW", Help17uText.RAW).padding(start = 16.dp, top = 16.dp, bottom = 2.dp))
+        modifier = Modifier.help17u("MotionCam RAW", Help17uText.RAW + "\n\n" + Help17uText.DEVELOP).padding(start = 16.dp, top = 16.dp, bottom = 2.dp))
     Text("Developed from ${i.name} at EI ${i.ei}${if (i.auto) " (Auto)" else ""} into ${OpenDrt.Input.of(i.out).label}. A change here develops the .mcraw " +
         "again in the background; the clip switches when it is done and keeps its grade.",
         color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
     Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.help17u("Develop at EI", Help17uText.EI).padding(start = 16.dp, top = 6.dp, bottom = 4.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (v in McrawFolder17u.EIS) ToggleChip(if (v == 0) "Auto" + (if (i.auto) " (${i.ei})" else "") else "$v", ei == v, { ei = v }, Modifier.help17u("Develop at EI", Help17uText.EI).testTag("raw:ei$v"))
+        for (v in McrawFolder17u.EIS) ToggleChip(if (v == 0) "Auto" + (if (i.auto) " (${i.ei})" else "") else "$v", ei == v, { ei = v }, Modifier.testTag("raw:ei$v"), help = "Develop at EI" to Help17uText.EI)
     }
     val outs = OpenDrt.Input.entries.filter { it != OpenDrt.Input.REC709 }
     Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
@@ -78,7 +78,7 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
                 // the clip's input follows the develop: its curve, and the EI it was shot at (the rating stays)
                 gs.setAll(ids.associateWith { id -> followDevelop(gs.of(id), newEi, newOut) })
             }
-        }, enabled = changed && working == null, modifier = Modifier.help17u("Develop", Help17uText.DEVELOP).testTag("raw:develop")) { Text("Develop") }
+        }, enabled = changed && working == null, modifier = Modifier.testTag("raw:develop")) { Text("Develop") }
     }
 }
 

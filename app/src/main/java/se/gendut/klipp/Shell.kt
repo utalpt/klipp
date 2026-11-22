@@ -15,6 +15,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.horizontalDrag
@@ -537,6 +538,7 @@ internal class DockItem(
 /** The smallest a dock name shrinks to on one line before it breaks onto two. */
 private val ONE_LINE_MIN = 8.5.sp
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun DockAction(item: DockItem, modifier: Modifier = Modifier) {
     val haptics = rememberHaptics()
@@ -548,8 +550,9 @@ internal fun DockAction(item: DockItem, modifier: Modifier = Modifier) {
             .then(if (item.tag != null) Modifier.testTag(item.tag) else Modifier)
             .semantics { selected = item.primary; item.desc?.let { contentDescription = it } }
             // Klipp Lab: long-press help (the help text, else the action's description)
-            .then((Help17uText.of(item.tag) ?: item.desc)?.let { Modifier.help17u(item.label, it) } ?: Modifier)
-            .clickable(interactionSource = src, indication = null) { if (item.strong) haptics.heavy() else haptics.press(); item.onClick() },
+            .combinedClickable(interactionSource = src, indication = null, onLongClick = onLongHelp17u(item.label, Help17uText.of(item.tag) ?: item.desc)) {
+                if (item.strong) haptics.heavy() else haptics.press(); item.onClick()
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

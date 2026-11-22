@@ -1,7 +1,6 @@
 package se.gendut.klipp
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -9,40 +8,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * Klipp Lab: long-press help. A long press (held still) on a control marked with [help17u] shows what it does; a tap
- * or a drag works as before. The text shows in [Help17uHost] (one, at the app's root).
+ * Klipp Lab: long-press help. A long press on a control shows what it does; a tap or a drag works as before. Clickable
+ * controls take it as their own long click (combinedClickable), labels through [help17u]. The text shows in
+ * [Help17uHost] (one, at the app's root).
  */
 object Help17u {
     var shown by mutableStateOf<Pair<String, String>?>(null)
 }
 
+/** Long press on a label (a text, a slider's name): shows [text]. Clickable controls use [onLongHelp17u] instead. */
 fun Modifier.help17u(title: String, text: String): Modifier = this.pointerInput(title, text) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        val slop = viewConfiguration.touchSlop
-        // null = held still for the long-press time; false = lifted or moved before it (a tap or a drag: not ours)
-        val early = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-            var gone = false
-            while (!gone) {
-                val e = awaitPointerEvent(PointerEventPass.Initial)
-                val ch = e.changes.firstOrNull { it.id == down.id }
-                gone = ch == null || !ch.pressed || (ch.position - down.position).getDistance() > slop
-            }
-            false
-        }
-        if (early != null) return@awaitEachGesture
-        Help17u.shown = title to text
-        // the rest of this touch belongs to the help: no tap or drag underneath
-        do {
-            val e = awaitPointerEvent(PointerEventPass.Initial)
-            e.changes.forEach { it.consume() }
-        } while (e.changes.any { it.pressed })
-    }
+    detectTapGestures(onLongPress = { Help17u.shown = title to text })
 }
+
+/** For a control's own combinedClickable: the long click that shows the help, or null when there is none. */
+fun onLongHelp17u(title: String, text: String?): (() -> Unit)? = text?.let { t -> { Help17u.shown = title to t } }
 
 @Composable
 fun Help17uHost() {

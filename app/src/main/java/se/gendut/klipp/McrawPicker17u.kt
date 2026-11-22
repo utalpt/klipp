@@ -109,7 +109,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, modifier = Modifier.help17u("Develop at EI", Help17uText.EI).padding(end = 8.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(McrawFolder17u.EIS) { v -> ToggleChip(McrawFolder17u.eiLabel(v), ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.help17u("Develop at EI", Help17uText.EI).testTag("mcraw:ei$v")) }
+            items(McrawFolder17u.EIS) { v -> ToggleChip(McrawFolder17u.eiLabel(v), ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.testTag("mcraw:ei$v"), help = "Develop at EI" to Help17uText.EI) }
         }
     }
     var outKey by remember { mutableStateOf(McrawFolder17u.out(ctx)) }

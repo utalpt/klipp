@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -229,8 +230,10 @@ fun ActionTile(label: String, icon: ImageVector, modifier: Modifier = Modifier, 
  * On/off chip: off = filled neutral surface with soft corners, on = the accent container, fully round and with a check
  * mark (shape and color show the state, no outline).
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ToggleChip(label: String, on: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+fun ToggleChip(label: String, on: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null,
+               /** Klipp Lab: long-press help (title, text). */ help: Pair<String, String>? = null) {
     val haptics = rememberHaptics()
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
@@ -239,7 +242,8 @@ fun ToggleChip(label: String, on: Boolean, onClick: () -> Unit, modifier: Modifi
     val fg by animateColorAsState(if (on) K.PrimarySoft else K.OnSurface, label = "tcf")
     Row(
         modifier.height(44.dp).clip(RoundedCornerShape(r)).background(bg)
-            .clickable(interactionSource = src, indication = null, role = Role.Checkbox) { haptics.tick(); onClick() }
+            .combinedClickable(interactionSource = src, indication = null, role = Role.Checkbox,
+                onLongClick = help?.let { h -> { haptics.tick(); Help17u.shown = h } }) { haptics.tick(); onClick() }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
