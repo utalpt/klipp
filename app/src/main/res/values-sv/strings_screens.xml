@@ -331,4 +331,13 @@
     <string name="videopicker17u_allow">Ge åtkomst</string>
     <string name="videopicker17u_none">Inga videor hittades på telefonen.</string>
     <string name="videopicker17u_clear">Rensa</string>
+    <string name="projects17u_select">Välj projekt</string>
+    <string name="projects17u_select_several">Välj flera</string>
+    <string name="projects17u_selected">%1$d valda</string>
+    <string name="projects17u_all">Alla</string>
+    <string name="projects17u_cancel">Avbryt</string>
+    <plurals name="projects17u_delete_title">
+        <item quantity="one">Radera %1$d projekt?</item>
+        <item quantity="other">Radera %1$d projekt?</item>
+    </plurals>
 </resources>

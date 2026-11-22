@@ -331,4 +331,13 @@
     <string name="videopicker17u_allow">Allow access</string>
     <string name="videopicker17u_none">No videos found on the phone.</string>
     <string name="videopicker17u_clear">Clear</string>
+    <string name="projects17u_select">Select projects</string>
+    <string name="projects17u_select_several">Select several</string>
+    <string name="projects17u_selected">%1$d selected</string>
+    <string name="projects17u_all">All</string>
+    <string name="projects17u_cancel">Cancel</string>
+    <plurals name="projects17u_delete_title">
+        <item quantity="one">Delete %1$d project?</item>
+        <item quantity="other">Delete %1$d projects?</item>
+    </plurals>
 </resources>
