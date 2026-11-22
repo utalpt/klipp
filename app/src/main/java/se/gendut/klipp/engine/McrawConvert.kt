@@ -27,7 +27,7 @@ import java.util.concurrent.ArrayBlockingQueue
  * Klipp then edits like any log clip (its default input, "Sony S-Log3 / S-Gamut3.Cine": no setting to change).
  *
  * Per frame, on the GPU: the frame's own black level, the lens shading map (MotionCam doesn't bake it in), the as-shot
- * white balance, a bilinear demosaic, the camera's ForwardMatrix1 (ColorMatrix1 when there is none) to XYZ, Bradford
+ * white balance, a Malvar–He–Cutler demosaic, the camera's ForwardMatrix1 (ColorMatrix1 when there is none) to XYZ, Bradford
  * D50 → D65, S-Gamut3.Cine and the S-Log3 curve. The sensor's clip lands [HEADROOM] stops over 18 % grey (as S-Log3 at
  * EI 800); clipped highlights stay neutral. The frames are decoded on a second thread while the GPU and the encoder
  * work. First version: picture only (no sound yet), the file's own size when the encoder takes it.
@@ -501,26 +501,29 @@ out vec4 color;
 int at(ivec4 v, int i) { return i == 0 ? v.x : i == 1 ? v.y : i == 2 ? v.z : v.w; }
 float atf(vec4 v, int i) { return i == 0 ? v.x : i == 1 ? v.y : i == 2 ? v.z : v.w; }
 
-// the lens shading gain of map channel ch at pixel p (bilinear on the grid)
-float shading(int ch, ivec2 p) {
-    if (useShade == 0) return 1.0;
+// the lens shading gains of the four map channels at pixel p (bilinear on the grid); 1 without a map
+vec4 shading4(ivec2 p) {
+    if (useShade == 0) return vec4(1.0);
     vec2 g = (vec2(p) + 0.5) / vec2(full) * vec2(grid - 1);
     ivec2 g0 = clamp(ivec2(floor(g)), ivec2(0), grid - 1);
     ivec2 g1 = min(g0 + 1, grid - 1);
     vec2 f = g - vec2(g0);
-    float a = atf(texelFetch(shade, g0, 0), ch), b = atf(texelFetch(shade, ivec2(g1.x, g0.y), 0), ch);
-    float c = atf(texelFetch(shade, ivec2(g0.x, g1.y), 0), ch), d = atf(texelFetch(shade, g1, 0), ch);
+    vec4 a = texelFetch(shade, g0, 0), b = texelFetch(shade, ivec2(g1.x, g0.y), 0);
+    vec4 c = texelFetch(shade, ivec2(g0.x, g1.y), 0), d = texelFetch(shade, g1, 0);
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-// white-balanced, shading-corrected value at p (0..1 = black..clip before the white balance)
-float value(ivec2 p, out int col) {
+int colorOf(ivec2 p) { return at(colorAt, (p.y & 1) * 2 + (p.x & 1)); }
+
+// white-balanced, shading-corrected value at p (0..1 = black..clip before the white balance); the shading map is
+// smooth, so the centre's gains [sh] serve the 5×5 around it
+float value(ivec2 p, vec4 sh) {
     p = clamp(p, ivec2(0), size - 1);
     int k = (p.y & 1) * 2 + (p.x & 1);
-    col = at(colorAt, k);
+    int col = at(colorAt, k);
     float bl = atf(black, k);
     float v = (float(texelFetch(raw, p, 0).r) - bl) / (white - bl);
-    v = clamp(v, 0.0, 1.0) * shading(at(shadeAt, k), p);
+    v = clamp(v, 0.0, 1.0) * atf(sh, at(shadeAt, k));
     return v * (col == 0 ? wb.r : col == 1 ? wb.g : wb.b);
 }
 
@@ -533,23 +536,31 @@ void main() {
     ivec2 p = ivec2(pos * vec2(size));
     if (scale != vec2(1.0)) p = ivec2((floor(pos * vec2(size) / scale) + 0.5) * scale);
     p = clamp(p, ivec2(0), size - 1);
-    // bilinear demosaic: each colour is the mean of that colour in the 3×3 around (the centre alone when it has it)
-    vec3 sum = vec3(0.0);
-    vec3 cnt = vec3(0.0);
-    int cc;
-    float cv = value(p, cc);
-    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
-        if (dx == 0 && dy == 0) continue;
-        int c;
-        float v = value(p + ivec2(dx, dy), c);
-        if (c == cc) continue;
-        if (c == 0) { sum.r += v; cnt.r += 1.0; } else if (c == 1) { sum.g += v; cnt.g += 1.0; } else { sum.b += v; cnt.b += 1.0; }
+    vec4 sh = shading4(p);
+    // Malvar–He–Cutler demosaic (gradient-corrected bilinear, 5×5)
+    float c  = value(p, sh);
+    float h1 = value(p + ivec2(-1, 0), sh) + value(p + ivec2(1, 0), sh);
+    float v1 = value(p + ivec2(0, -1), sh) + value(p + ivec2(0, 1), sh);
+    float h2 = value(p + ivec2(-2, 0), sh) + value(p + ivec2(2, 0), sh);
+    float v2 = value(p + ivec2(0, -2), sh) + value(p + ivec2(0, 2), sh);
+    float dg = value(p + ivec2(-1, -1), sh) + value(p + ivec2(1, -1), sh) + value(p + ivec2(-1, 1), sh) + value(p + ivec2(1, 1), sh);
+    int cc = colorOf(p);
+    vec3 rgb;
+    if (cc == 1) {
+        // green site: the colour beside it and the colour above/below it
+        float sideC = (5.0 * c + 4.0 * h1 - h2 + 0.5 * v2 - dg) / 8.0;
+        float vertC = (5.0 * c + 4.0 * v1 - v2 + 0.5 * h2 - dg) / 8.0;
+        int side = colorOf(p + ivec2(1, 0));
+        rgb = side == 0 ? vec3(sideC, c, vertC) : vec3(vertC, c, sideC);
+    } else {
+        float g = (4.0 * c + 2.0 * (h1 + v1) - (h2 + v2)) / 8.0;
+        float other = (6.0 * c + 2.0 * dg - 1.5 * (h2 + v2)) / 8.0;
+        rgb = cc == 0 ? vec3(c, g, other) : vec3(other, g, c);
     }
-    vec3 rgb = sum / max(cnt, vec3(1.0));
-    if (cc == 0) rgb.r = cv; else if (cc == 1) rgb.g = cv; else rgb.b = cv;
+    rgb = max(rgb, vec3(0.0));
     // clipped highlights stay neutral: no channel above the clip of the least-gained colour (with the lens shading
     // gain at this point, which lifts the clip towards the corners)
-    rgb = min(rgb, vec3(clipAt * shading(1, p)));
+    rgb = min(rgb, vec3(clipAt * atf(sh, 1)));
     vec3 lin = max(camToOut * rgb, vec3(0.0)) * expo;
     color = vec4(slog3(lin.r), slog3(lin.g), slog3(lin.b), 1.0);
 }"""
