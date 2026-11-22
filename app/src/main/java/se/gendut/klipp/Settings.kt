@@ -158,7 +158,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
     // (the empty parts take the touches too: the editor lies under the page)
     Column(Modifier.fillMaxSize().background(K.Bg).pointerInput(Unit) {}.safeArea17u().testTag("settings")) {
         var page by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1) }
-        val pageTitles = listOf(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_group_playback), stringResource(R.string.settings_group_export), stringResource(R.string.settings_group_developer), stringResource(R.string.settings_group_help), stringResource(R.string.settings_group_about))
+        val pageTitles = listOf(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_group_playback), stringResource(R.string.settings_group_export), stringResource(R.string.settings_group_developer), stringResource(R.string.settings_group_help), stringResource(R.string.settings_group_about), stringResource(R.string.settings17u_storage))
         val about = remember { AboutNav() }
         if (page >= 0) androidx.activity.compose.BackHandler { page = -1 }
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -174,7 +174,8 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                     CategoryRow(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_cat_appearance), Ic.Eye, "set:cat:appearance") { page = 0 }
                     CategoryRow(stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_cat_timeline), Ic.Trim, "set:cat:timeline") { page = 1 }
                     CategoryRow(stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_cat_pipeline), Ic.Film, "set:cat:pipeline") { page = 2 }
-                    CategoryRow(stringResource(R.string.settings_group_playback), stringResource(R.string.settings_cat_playback), Ic.Folder, "set:cat:playback") { page = 3 }
+                    CategoryRow(stringResource(R.string.settings_group_playback), stringResource(R.string.settings_cat_playback), Ic.Play, "set:cat:playback") { page = 3 }
+                    CategoryRow(stringResource(R.string.settings17u_storage), stringResource(R.string.settings17u_cat_storage), Ic.Folder, "set:cat:storage") { page = 8 }
                     CategoryRow(stringResource(R.string.settings_group_export), stringResource(R.string.settings_cat_export), Ic.Download, "set:cat:export") { page = 4 }
                     CategoryRow(stringResource(R.string.settings_group_developer), stringResource(R.string.settings_cat_developer), Ic.Gear, "set:cat:developer") { page = 5 }
                     CategoryRow(stringResource(R.string.settings_group_help), stringResource(R.string.settings_cat_help), Ic.Bulb, "set:cat:help") { page = 6 }
@@ -278,10 +279,18 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
 
                 }
                 3 -> PanelCard(Modifier.padding(top = 8.dp)) {
-            StorageSummary(ctx)
-            // Klipp Lab: MotionCam develops, and the size above which opening a project warns
-            Storage17uRows(ctx)
             ProxySection(ctx)
+            var renderAuto by remember { mutableStateOf(se.gendut.klipp.engine.RenderCache.auto) }
+            SwitchRow(stringResource(R.string.settings_render_auto), stringResource(R.string.app_render_auto_hint), renderAuto, "set:renderAuto") {
+                renderAuto = it; se.gendut.klipp.engine.RenderCache.setAuto(ctx, it)
+            }
+
+                }
+                // Klipp Lab: Storage – everything the app keeps on the phone, each with its Clear, and the warning limit
+                8 -> PanelCard(Modifier.padding(top = 8.dp)) {
+            StorageSummary(ctx)
+            Storage17uRows(ctx)
+            Proxy17uRow(ctx)
             var cacheSize by remember { mutableStateOf(0L) }
             androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.NodeCache.revision) {
                 cacheSize = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { se.gendut.klipp.engine.NodeCache.size(ctx) }
@@ -293,10 +302,6 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                         color = K.OnSurfaceVar, fontSize = 12.sp)
                 }
                 FlatTextButton(onClick = { se.gendut.klipp.engine.NodeCache.clear(ctx); cacheSize = 0 }, modifier = Modifier.testTag("set:clearNodeCache")) { Text(stringResource(R.string.settings_clear)) }
-            }
-            var renderAuto by remember { mutableStateOf(se.gendut.klipp.engine.RenderCache.auto) }
-            SwitchRow(stringResource(R.string.settings_render_auto), stringResource(R.string.app_render_auto_hint), renderAuto, "set:renderAuto") {
-                renderAuto = it; se.gendut.klipp.engine.RenderCache.setAuto(ctx, it)
             }
             var renderSize by remember { mutableStateOf(0L) }
             androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.RenderCache.revision) {
@@ -310,6 +315,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                 FlatTextButton(onClick = { se.gendut.klipp.engine.RenderCache.clear(); renderSize = 0 }, modifier = Modifier.testTag("set:clearRenders")) { Text(stringResource(R.string.settings_clear)) }
             }
 
+            Clear17uAll(ctx)
                 }
                 4 -> PanelCard(Modifier.padding(top = 8.dp)) {
             Text(stringResource(R.string.settings_export_note), color = K.OnSurfaceVar, fontSize = 12.sp,

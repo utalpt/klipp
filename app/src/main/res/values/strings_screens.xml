@@ -48,6 +48,8 @@
     <string name="settings_tonemap_codec_hint">the phone\'s own tone mapping (Android 13+)</string>
     <string name="settings_ten_bit_note">10-bit media (HEVC Main10, AVC High10, VP9/AV1 10-bit, APV, ProRes, HDR) is detected automatically: proxy files and export (Auto) then become 10-bit too.</string>
     <string name="settings_group_playback">Playback</string>
+    <string name="settings17u_storage">Storage</string>
+    <string name="settings17u_cat_storage">Space used, Clear for each kind, the warning limit</string>
     <string name="settings_node_cache">Node cache</string>
     <string name="settings_node_cache_hint">Long-press a node on the Color page → Cache node: the image up to and including the node is pre-rendered at full quality (source resolution, 10-bit) and plays without computing the nodes. %1$.1f GB.</string>
     <string name="settings_clear">Clear</string>

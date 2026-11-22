@@ -48,6 +48,8 @@
     <string name="settings_tonemap_codec_hint">telefonens egen tonmappning (Android 13+)</string>
     <string name="settings_ten_bit_note">10-bitarsmaterial (HEVC Main10, AVC High10, VP9/AV1 10 bitar, APV, ProRes, HDR) känns igen automatiskt: proxyfilerna och exporten (Auto) blir då också 10 bitar.</string>
     <string name="settings_group_playback">Uppspelning</string>
+    <string name="settings17u_storage">Lagring</string>
+    <string name="settings17u_cat_storage">Utrymme som används, Rensa för varje sort, varningsgränsen</string>
     <string name="settings_node_cache">Nodcache</string>
     <string name="settings_node_cache_hint">Håll på en nod i färgsidan → Cacha noden: bilden till och med noden renderas i förväg i full kvalitet (originalets upplösning, 10 bitar) och spelas utan att noderna räknas. %1$.1f GB.</string>
     <string name="settings_clear">Rensa</string>

@@ -115,7 +115,7 @@ fun McrawProbeRow(ctx: Context) {
     }
 }
 
-/** Klipp Lab: Settings → Playback, under the storage summary: the MotionCam develops and the warning limit. */
+/** Klipp Lab: Settings → Storage, under the storage summary: the MotionCam develops and the warning limit. */
 @Composable
 fun Storage17uRows(ctx: Context) {
     val scope = rememberCoroutineScope()
@@ -146,4 +146,51 @@ fun Storage17uRows(ctx: Context) {
             }
         }
     }
+}
+
+/** Klipp Lab: Settings → Storage – the proxy files: their size and Clear (made again in the background when needed). */
+@Composable
+fun Proxy17uRow(ctx: Context) {
+    val p = se.gendut.klipp.engine.Proxies
+    var size by remember { mutableStateOf(0L) }
+    androidx.compose.runtime.LaunchedEffect(p.revision) { size = withContext(Dispatchers.IO) { p.size(ctx) } }
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Proxies", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("%.1f GB · lighter copies for playback; made again in the background when needed (Settings → Playback).".format(size / 1e9),
+                color = K.OnSurfaceVar, fontSize = 12.sp)
+        }
+        FlatTextButton(onClick = { p.clear(ctx); size = 0 }, modifier = Modifier.testTag("set:clearProxies")) { Text("Clear") }
+    }
+}
+
+/**
+ * Klipp Lab: Settings → Storage – clears what is made again by itself (proxies, node cache, renders), after asking.
+ * MotionCam develops are not touched: they are made again only by importing the .mcraw.
+ */
+@Composable
+fun Clear17uAll(ctx: Context) {
+    var ask by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Clear caches", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Proxies, node cache and renders at once – all made again when needed. MotionCam develops stay.", color = K.OnSurfaceVar, fontSize = 12.sp)
+        }
+        FlatTextButton(onClick = { ask = true }, modifier = Modifier.testTag("set:clearAll")) { Text("Clear") }
+    }
+    if (ask) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { ask = false },
+        title = { Text("Clear caches?") },
+        text = { Text("Proxies, node cache and renders are deleted. Playback may be slower until the proxies are made again.") },
+        confirmButton = {
+            FlatTextButton(onClick = {
+                ask = false
+                se.gendut.klipp.engine.Proxies.clear(ctx)
+                se.gendut.klipp.engine.NodeCache.clear(ctx)
+                se.gendut.klipp.engine.RenderCache.clear()
+            }, modifier = Modifier.testTag("set:clearAllYes")) { Text("Clear") }
+        },
+        dismissButton = { FlatTextButton(onClick = { ask = false }) { Text("Cancel") } },
+        containerColor = K.SurfaceHigh,
+    )
 }

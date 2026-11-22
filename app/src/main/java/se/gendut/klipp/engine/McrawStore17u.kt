@@ -171,6 +171,6 @@ object StorageWarn17u {
         if (u.total < lim * 1_000_000_000L) return null
         fun gb(b: Long) = "%.1f".format(b / 1e9)
         return "Klipp Lab is using ${gb(u.total)} GB (proxies ${gb(u.proxies)}, cache ${gb(u.nodes)}, renders ${gb(u.renders)}, " +
-            "MCRAW ${gb(u.mcraw)}, other ${gb(u.other)}) – over your $lim GB. Settings → Playback to clear."
+            "MCRAW ${gb(u.mcraw)}, other ${gb(u.other)}) – over your $lim GB. Settings → Storage to clear."
     }
 }

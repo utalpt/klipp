@@ -68,11 +68,14 @@ Import and timeline
   with a preview of the middle frame, size, frame rate, length and date; picked with the videos and developed to S-Log3
   on import. "Develop at EI" 400 / 800 / 1600 / 3200 sets where the sensor's clip lands (as on a log camera).
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
-  develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
+  develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Storage
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
 - MCRAW: every develop asks for its playback proxy at once. A develop made again (RAW settings) could be left without
   one – its info was still empty when the proxies were checked – and played from the 4K 60 fps file, with the picture
   standing still.
+- Settings → Storage, a page of its own: the space Klipp Lab uses, a row with Clear for each kind (MotionCam
+  develops, proxies, node cache, renders), Clear caches (proxies, node cache and renders at once, after asking) and the
+  warning limit. Playback keeps the proxy and render settings.
 - HLG · OpenDRT is no longer blocked by the grade of a deleted clip (kept for undo): only the clips on the timeline
   count – the same fix as Klipp's alpha 241 (2797f03, by Flabbjaxaren).
 - MCRAW → HLG without setting up OpenDRT: with MotionCam clips on the timeline, HLG · OpenDRT (and Dolby Vision ·
@@ -97,7 +100,7 @@ Import and timeline
 - White balance in the clip's input (Color → the EI chip): Temperature (2000–12000 K, "As shot" in the middle) and
   Tint, applied in the linear light on the clip's own primaries before every node – as a raw developer's, live while
   dragging. Works on any log clip; for a MotionCam develop it moves away from the as-shot white. The chip shows "· WB".
-- Storage warning: Settings → Playback → "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (20 by default, or
+- Storage warning: Settings → Storage → "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (20 by default, or
   off) – opening a project then says how much the proxies, cache, renders, MCRAW develops and freeze frames take.
 - MCRAW: Malvar–He–Cutler demosaic (gradient-corrected, 5×5) in place of the plain bilinear one – sharper fine
   detail and fewer colour fringes on edges.
