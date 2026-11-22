@@ -1,8 +1,8 @@
 # 🎬 Klipp
 
 > 🧪 **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only)
-> on the `xiaomi-17u` branch. Its focus is log video and Dolby Vision from the stock camera mods for the Xiaomi 17, 15
-> and 14 Ultra, while staying a general video editor. It runs on any Android 10+ phone (64-bit); built and tested
+> on the `xiaomi-17u` branch. Its focus is log video and Dolby Vision from George's Stock camera mods, while
+> staying a general video editor. It runs on any Android 10+ phone (64-bit); built and tested
 > on a Xiaomi 17 Ultra. HLG export needs a 10-bit HDR HEVC encoder; the Dolby Vision options only show on phones
 > with a Dolby Vision encoder (the 17 Ultra has one; the 15 and 14 Ultra not checked yet). It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
 > Klipp as pull requests; issues with the fork's own features go here, not to Klipp.
