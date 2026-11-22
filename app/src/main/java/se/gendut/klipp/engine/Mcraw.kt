@@ -22,6 +22,14 @@ object Mcraw {
     @JvmStatic private external fun nativeDecode(h: Long, index: Int): Long
     @JvmStatic private external fun nativeLastBytes(h: Long): Long
     @JvmStatic private external fun nativePreview(h: Long, out: IntArray, w: Int, h2: Int): Boolean
+    @JvmStatic private external fun nativeDecodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String?
+    @JvmStatic private external fun nativeLastLitRow(h: Long): Int
+
+    // for McrawConvert
+    internal fun open(fd: Int): Long = nativeOpen(fd)
+    internal fun close(h: Long) = nativeClose(h)
+    internal fun info(h: Long): String = nativeInfo(h)
+    internal fun decodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String? = nativeDecodeTo(h, index, out)
 
     class Probe(val summary: String, val log: String, val preview: Bitmap?, val logFile: File?)
 
@@ -103,6 +111,7 @@ object Mcraw {
             val mid = n / 2
             var bmp: Bitmap? = null
             if (nativeDecode(h, mid) >= 0 && w > 0 && hh > 0) {
+                line("middle frame: last row with picture ${nativeLastLitRow(h)} of ${hh - 1}")
                 val pw = 960.coerceAtMost(w / 2); val ph = (pw.toLong() * hh / w).toInt().coerceAtLeast(1)
                 val px = IntArray(pw * ph)
                 if (nativePreview(h, px, pw, ph)) bmp = Bitmap.createBitmap(px, pw, ph, Bitmap.Config.ARGB_8888)

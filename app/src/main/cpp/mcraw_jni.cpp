@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <unistd.h>
@@ -105,6 +106,40 @@ JNIEXPORT jlong JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeDecode(JNIEnv*, 
         LOGE("decode %d: %s", index, e.what());
         return -1;
     }
+}
+
+/**
+ * Decodes frame [index] and copies its pixels (16-bit, little-endian, width × height) into the direct buffer [out].
+ * Returns the frame's metadata as JSON, or null on failure (or when [out] is too small).
+ */
+JNIEXPORT jstring JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeDecodeTo(JNIEnv* env, jclass, jlong hp, jint index, jobject out) {
+    auto* h = get(hp);
+    try {
+        const auto& frames = h->decoder->getFrames();
+        if (index < 0 || index >= (jint) frames.size()) return nullptr;
+        h->decoder->loadFrame(frames[index], h->data, h->meta);
+        auto* dst = static_cast<uint8_t*>(env->GetDirectBufferAddress(out));
+        jlong cap = env->GetDirectBufferCapacity(out);
+        if (!dst || cap < (jlong) h->data.size()) return nullptr;
+        std::memcpy(dst, h->data.data(), h->data.size());
+        return str(env, h->meta.dump());
+    } catch (const std::exception& e) {
+        LOGE("decodeTo %d: %s", index, e.what());
+        return nullptr;
+    }
+}
+
+/** The last row (0-based) of the last decoded frame that has any value above the black level + 8, or -1. */
+JNIEXPORT jint JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeLastLitRow(JNIEnv*, jclass, jlong hp) {
+    auto* h = get(hp);
+    int w = h->meta.value("width", 0), ht = h->meta.value("height", 0);
+    if (w <= 0 || ht <= 0 || h->data.size() < (size_t) w * ht * 2) return -1;
+    const auto* px = reinterpret_cast<const uint16_t*>(h->data.data());
+    for (int y = ht - 1; y >= 0; y--) {
+        const uint16_t* row = px + (size_t) y * w;
+        for (int x = 0; x < w; x += 7) if (row[x] > 72) return y;
+    }
+    return -1;
 }
 
 /** Bytes in the last decoded frame (expected width × height × 2). */

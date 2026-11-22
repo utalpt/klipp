@@ -38,9 +38,12 @@ fun McrawProbeRow(ctx: Context) {
     var running by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var result by remember { mutableStateOf<Mcraw.Probe?>(null) }
+    var lastUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var converting by remember { mutableStateOf(false) }
+    var converted by remember { mutableStateOf<se.gendut.klipp.engine.McrawConvert.Result?>(null) }
     val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        running = true; progress = 0f
+        running = true; progress = 0f; lastUri = uri
         scope.launch {
             result = withContext(Dispatchers.Default) { Mcraw.probe(ctx, uri) { progress = it } }
             running = false
@@ -49,21 +52,49 @@ fun McrawProbeRow(ctx: Context) {
     Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("MCRAW test (Klipp Lab)", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(if (running) "Decoding… ${(progress * 100).toInt()} %" else "Pick a MotionCam .mcraw file: how fast this phone decodes it, and a preview of one frame",
+            Text(if (converting) "Converting to S-Log3… ${(progress * 100).toInt()} %" else if (running) "Decoding… ${(progress * 100).toInt()} %" else "Pick a MotionCam .mcraw file: how fast this phone decodes it, and a preview of one frame",
                 color = K.OnSurfaceVar, fontSize = 12.sp)
         }
-        FlatTextButton(onClick = { pick.launch(arrayOf("*/*")) }, enabled = !running, modifier = Modifier.testTag("set:mcrawProbe")) { Text("Pick file") }
+        FlatTextButton(onClick = { pick.launch(arrayOf("*/*")) }, enabled = !running && !converting, modifier = Modifier.testTag("set:mcrawProbe")) { Text("Pick file") }
     }
     result?.let { r ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { result = null },
             confirmButton = { FlatTextButton(onClick = { result = null }) { Text("OK") } },
+            // develop the file into an S-Log3 clip (Movies/Klipp Lab) and time it
+            dismissButton = {
+                FlatTextButton(onClick = {
+                    val uri = lastUri ?: return@FlatTextButton
+                    result = null; converting = true; progress = 0f
+                    scope.launch {
+                        converted = withContext(Dispatchers.Default) {
+                            se.gendut.klipp.engine.McrawConvert.convert(ctx, uri) { progress = it }.also { r ->
+                                runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
+                            }
+                        }
+                        converting = false
+                    }
+                }, modifier = Modifier.testTag("set:mcrawConvert")) { Text("Convert to S-Log3") }
+            },
             title = { Text("MCRAW test") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     r.preview?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxWidth().padding(bottom = 8.dp)) }
                     Text(r.summary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     r.logFile?.let { Text("Log: ${it.absolutePath}", fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
+                    Text(r.log, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            },
+        )
+    }
+    converted?.let { r ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { converted = null },
+            confirmButton = { FlatTextButton(onClick = { converted = null }) { Text("OK") } },
+            title = { Text("MCRAW → S-Log3") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(r.summary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(r.log, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             },
