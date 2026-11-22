@@ -172,7 +172,8 @@ class ProjectController(
 
     // ------------------------------------------------------------------ import
 
-    fun import(picked: List<Uri>) = scope.launch {
+    /** @param keepOrder Klipp 17U: added to the timeline in [picked]'s order (Klipp's video picker), not by name */
+    fun import(picked: List<Uri>, keepOrder: Boolean = false) = scope.launch {
         if (picked.isEmpty()) return@launch
         busy = true
         // the files are opened (and names read) on a background thread – many files at once used to freeze the app
@@ -223,7 +224,10 @@ class ProjectController(
                     // names carry the date and time, so this is the order they were shot in) – no source/Insert step
                     if (se.gendut.klipp.AppPrefs.addOnImport(context)) {
                         val names = snap.media.associate { it.id to it.name }
-                        added = insertAtEnd((0 until items.length()).map { items.getLong(it) }.sortedBy { names[it]?.lowercase() ?: "" })
+                        val ids = (0 until items.length()).map { items.getLong(it) }
+                        // the picked order: each item's place among the opened files (matched by path, as above)
+                        val place = snap.media.associate { m -> m.id to (0 until paths.length()).firstOrNull { paths.getString(it) == m.path } }
+                        added = insertAtEnd(if (keepOrder) ids.sortedBy { place[it] ?: Int.MAX_VALUE } else ids.sortedBy { names[it]?.lowercase() ?: "" })
                     }
                 }
                 refresh()

@@ -322,4 +322,13 @@
     <string name="medialibrary_missing_badge">Saknas</string>
     <string name="settings_render_auto">Rendera automatiskt (alla projekt)</string>
     <string name="settings_delete_renders_all">Ta bort renderingar (alla projekt)</string>
+    <string name="videopicker17u_title">Videor</string>
+    <string name="videopicker17u_close">Stäng</string>
+    <string name="videopicker17u_all">Alla</string>
+    <string name="videopicker17u_files_app">Filappen</string>
+    <string name="videopicker17u_import">Importera %1$d</string>
+    <string name="videopicker17u_access">Ge åtkomst till dina videor för att se dem här med förhandsvisning, nyast först. Eller använd filappen.</string>
+    <string name="videopicker17u_allow">Ge åtkomst</string>
+    <string name="videopicker17u_none">Inga videor hittades på telefonen.</string>
+    <string name="videopicker17u_clear">Rensa</string>
 </resources>
