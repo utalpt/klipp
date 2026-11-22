@@ -10,7 +10,9 @@
 ## 🧪 What Klipp Lab adds
 
 - 🌈 **HLG export from the grade:** each clip's last OpenDRT node renders Rec.2100 HLG, 10-bit HEVC, tagged
-  BT.2020 / HLG (Google Photos shows it as HDR).
+  BT.2020 / HLG (Google Photos shows it as HDR). Ungraded clips, titles and captions are converted from SDR
+  (BT.2408, SDR white at 75 % HLG), and the export dialog shows what will actually be made. *(Both sent to Klipp too:
+  in its alpha 241.)*
 - 🎥 **Dolby Vision export from the grade:** the same HLG encoded by the phone's Dolby Vision encoder as Profile 8.4
   (HLG compatible), the dynamic metadata made from the edited frames.
 - 🔁 **Dolby Vision in, Dolby Vision out:** Dolby Vision clips cut and edited come out as Dolby Vision 8.4 again
@@ -25,6 +27,8 @@
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
 - 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
+- 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
+  the system again before sending you to the settings. *(Sent to Klipp too: in its alpha 241.)*
 - ➕ **Add to the timeline** in the order selected, or straight on import.
 - ⏱️ **Frame rates:** phone clips give a standard project rate (a 60 fps clip measured at 58.6 makes a 60 fps
   project), and the rate chosen for a new project is kept.
