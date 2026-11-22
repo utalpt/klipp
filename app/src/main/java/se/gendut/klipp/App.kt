@@ -1213,10 +1213,15 @@ private fun KlippAppContent(
         ) {
             androidx.activity.compose.BackHandler { videoPicker = false }
             VideoPickerScreen(
-                onImport = { uris ->
+                onImport = { picked ->
                     videoPicker = false
-                    controller?.import(uris, keepOrder = true)
-                    if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
+                    // Klipp Lab: MotionCam RAW picked here is developed to S-Log3 first, in its place in the order
+                    scope.launch {
+                        val uris = importMcraw17u(context, picked) { mcrawProgress = it }
+                        mcrawProgress = null
+                        controller?.import(uris, keepOrder = true)
+                        if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
+                    }
                 },
                 onFilesApp = { videoPicker = false; picker.launch(videoRequest()) },
                 onClose = { videoPicker = false },

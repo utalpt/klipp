@@ -107,6 +107,9 @@ object VideoLibrary {
     }
 }
 
+/** Klipp Lab: the picker's "folder" key of the MotionCam RAW list (no real folder is named so). */
+private const val MCRAW_FOLDER = "\u0000mcraw"
+
 @Composable
 fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onClose: () -> Unit) {
     val ctx = LocalContext.current
@@ -148,6 +151,15 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
         }
         val list = videos
         when {
+            // Klipp Lab: MotionCam RAW (its own folder, developed to S-Log3 on import)
+            folder == MCRAW_FOLDER -> {
+                LazyRow(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { ToggleChip(all, false, { folder = null }) }
+                    item { ToggleChip("MotionCam RAW", true, {}) }
+                }
+                Spacer(Modifier.height(4.dp))
+                McrawPanel17u(picked) { u -> haptics.tick(); picked = if (u in picked) picked - u else picked + u }
+            }
             !access -> Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.videopicker17u_access), color = K.OnSurfaceVar, fontSize = 15.sp)
                 PillButton(stringResource(R.string.videopicker17u_allow), {
@@ -164,6 +176,7 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
                 val folders = list.groupingBy { it.folder }.eachCount().entries.sortedByDescending { it.value }.map { it.key }.filter { it.isNotEmpty() }
                 LazyRow(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item { ToggleChip(all, folder == null, { folder = null }) }
+                    item { ToggleChip("MotionCam RAW", false, { folder = MCRAW_FOLDER }, Modifier.testTag("videoPicker:mcraw")) }
                     items(folders) { f -> ToggleChip(f, folder == f, { folder = f }) }
                 }
                 Spacer(Modifier.height(8.dp))

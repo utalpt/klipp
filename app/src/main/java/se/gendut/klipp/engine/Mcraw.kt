@@ -48,6 +48,43 @@ object Mcraw {
 
     class Probe(val summary: String, val log: String, val preview: Bitmap?, val logFile: File?)
 
+    /** A picker card's preview (the middle frame, padding rows cut off) and what the file is. */
+    class Thumb(val bitmap: Bitmap?, val width: Int, val height: Int, val fps: Double, val seconds: Double)
+
+    fun thumb(ctx: Context, uri: Uri): Thumb? {
+        if (!available) return null
+        val pfd = runCatching { ctx.contentResolver.openFileDescriptor(uri, "r") }.getOrNull() ?: return null
+        val h = nativeOpen(pfd.fd)
+        if (h == 0L) { pfd.close(); return null }
+        try {
+            val info = JSONObject(nativeInfo(h))
+            val frames = info.optJSONArray("frames") ?: return null
+            val n = frames.length()
+            if (n == 0) return null
+            val ff = info.optJSONObject("firstFrame") ?: JSONObject()
+            val w = ff.optInt("width"); var hh = ff.optInt("height")
+            val dur = if (n > 1) (frames.getLong(n - 1) - frames.getLong(0)) / 1e9 else 0.0
+            val fps = if (dur > 0) (n - 1) / dur else 0.0
+            var bmp: Bitmap? = null
+            if (nativeDecode(h, n / 2) >= 0 && w > 0 && hh > 0) {
+                val black = info.optJSONObject("container")?.optJSONArray("blackLevel")
+                val limit = (black?.let { a -> (0 until a.length()).maxOf { a.getDouble(it) } } ?: 0.0).toInt() + 1
+                val empty = nativeEmptyBottomRows(h, limit)
+                val ch = if (empty >= hh / 20) hh - empty else hh
+                val pw = 320; val ph = (pw.toLong() * hh / w).toInt().coerceAtLeast(1)
+                val px = IntArray(pw * ph)
+                if (nativePreview(h, px, pw, ph)) {
+                    val full = Bitmap.createBitmap(px, pw, ph, Bitmap.Config.ARGB_8888)
+                    bmp = Bitmap.createBitmap(full, 0, 0, pw, (ph.toLong() * ch / hh).toInt().coerceIn(1, ph))
+                }
+                hh = ch
+            }
+            return Thumb(bmp, w, hh, fps, dur + if (fps > 0) 1 / fps else 0.0)
+        } catch (_: Throwable) {
+            return null
+        } finally { nativeClose(h); pfd.close() }
+    }
+
     /** Runs the test on [uri]; [progress] gets 0..1. Blocking: call off the main thread. */
     fun probe(ctx: Context, uri: Uri, progress: (Float) -> Unit): Probe {
         val log = StringBuilder()

@@ -28,13 +28,13 @@ import java.util.concurrent.ArrayBlockingQueue
  *
  * Per frame, on the GPU: the frame's own black level, the lens shading map (MotionCam doesn't bake it in), the as-shot
  * white balance, a Malvar–He–Cutler demosaic, the camera's ForwardMatrix1 (ColorMatrix1 when there is none) to XYZ, Bradford
- * D50 → D65, S-Gamut3.Cine and the S-Log3 curve. The sensor's clip lands [HEADROOM] stops over 18 % grey (as S-Log3 at
- * EI 800); clipped highlights stay neutral. The frames are decoded on a second thread while the GPU and the encoder
+ * D50 → D65, S-Gamut3.Cine and the S-Log3 curve. The sensor's clip lands log2(EI/25) stops over 18 % grey (EI from the picker, 800 by
+ * default, as on a log camera); clipped highlights stay neutral. The frames are decoded on a second thread while the GPU and the encoder
  * work. First version: picture only (no sound yet), the file's own size when the encoder takes it.
  */
 object McrawConvert {
-    /** Stops of the sensor's clip over 18 % grey (EI 800 in Klipp's EI terms). */
-    const val HEADROOM = 5f
+    /** Stops of the sensor's clip over 18 % grey at [ei] (Klipp's EI terms: EI 800 = 5 stops). */
+    fun headroom(ei: Int): Float = kotlin.math.log2(ei / 25f)
 
     class Result(val uri: Uri?, val summary: String, val log: String)
 
@@ -74,6 +74,8 @@ object McrawConvert {
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
 
+            val ei = se.gendut.klipp.McrawFolder17u.ei(ctx)
+            line("developed at EI $ei (sensor clip ${"%.1f".format(headroom(ei))} stops over 18 % grey)")
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff)
             line("cfa $cfa  camera → S-Gamut3.Cine: ${camToOut.joinToString { "%.4f".format(it) }}")
@@ -166,7 +168,7 @@ object McrawConvert {
 
                 val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
-                    gl.setup(cfa, c, camToOut)
+                    gl.setup(cfa, c, camToOut, headroom(ei))
                     for (k in 0 until n) {
                         val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
@@ -193,7 +195,7 @@ object McrawConvert {
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), sensor clip at EI 800."
+                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
@@ -342,7 +344,7 @@ object McrawConvert {
             check(EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) { "eglMakeCurrent failed" }
         }
 
-        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray) {
+        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray, headroom: Float) {
             val pattern = when (cfa.lowercase()) { "bggr" -> "BGGR"; "grbg" -> "GRBG"; "gbrg" -> "GBRG"; else -> "RGGB" }
             var greens = 0
             for (p in 0 until 4) when (pattern[p]) {
@@ -365,7 +367,7 @@ object McrawConvert {
             GLES30.glUniform2i(loc("full"), w, h)
             GLES30.glUniform2f(loc("scale"), w / ow.toFloat(), ch / oh.toFloat())
             GLES30.glUniformMatrix3fv(loc("camToOut"), 1, true, camToOut, 0)
-            GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, HEADROOM.toDouble()).toFloat())
+            GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, headroom.toDouble()).toFloat())
             GLES30.glViewport(0, 0, ow, oh)
         }
 
