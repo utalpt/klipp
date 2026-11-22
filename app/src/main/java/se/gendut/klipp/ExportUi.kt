@@ -183,22 +183,24 @@ fun ExportOptions(
 
         }
         2 -> {
+    // Klipp Lab: the chips show what will be made (the plan), not a choice that can't apply to this project – a saved
+    // "Dolby Vision · keep HDR" showed selected in a project with no HDR clip while the file was SDR
     Chips {
-        Choice("SDR · Rec.709", !s.hdr && !s.hlg, true, "exp:sdr") { onChange(s.copy(hdr = false, hlg = false)) }
-        Choice(stringResource(R.string.exportui_hdr_keep), s.hdr && !s.dolby, hdrPossible && hdrBlocked == null, "exp:hdr") { onChange(s.copy(hdr = true, hlg = false, dolby = false, codec = MimeTypes.VIDEO_H265)) }
+        Choice("SDR · Rec.709", !plan.hdr && !plan.hlg, true, "exp:sdr") { onChange(s.copy(hdr = false, hlg = false)) }
+        Choice(stringResource(R.string.exportui_hdr_keep), plan.hdr && !plan.effective.dolby, hdrPossible && hdrBlocked == null, "exp:hdr") { onChange(s.copy(hdr = true, hlg = false, dolby = false, codec = MimeTypes.VIDEO_H265)) }
         // Klipp Lab: the clips' HDR (a Dolby Vision clip's HLG base) as Dolby Vision, new metadata from the edit
         if (se.gendut.klipp.engine.EncoderCaps.dolbyVisionSupported)
-            Choice("Dolby Vision · keep HDR", s.hdr && s.dolby, hdrPossible && hdrBlocked == null, "exp:dvKeep") { onChange(s.copy(hdr = true, hlg = false, dolby = true, codec = MimeTypes.VIDEO_H265)) }
-        Choice("HLG · OpenDRT", s.hlg && !s.dolby, hlgReady && se.gendut.klipp.engine.EncoderCaps.hdrSupported, "exp:hlg") { onChange(s.copy(hdr = false, hlg = true, dolby = false, codec = MimeTypes.VIDEO_H265)) }
+            Choice("Dolby Vision · keep HDR", plan.hdr && plan.effective.dolby, hdrPossible && hdrBlocked == null, "exp:dvKeep") { onChange(s.copy(hdr = true, hlg = false, dolby = true, codec = MimeTypes.VIDEO_H265)) }
+        Choice("HLG · OpenDRT", plan.hlg && !plan.effective.dolby, hlgReady && se.gendut.klipp.engine.EncoderCaps.hdrSupported, "exp:hlg") { onChange(s.copy(hdr = false, hlg = true, dolby = false, codec = MimeTypes.VIDEO_H265)) }
         // Klipp Lab: the same HLG as Dolby Vision 8.4, on phones with a Dolby Vision encoder
         if (se.gendut.klipp.engine.EncoderCaps.dolbyVisionSupported)
-            Choice("Dolby Vision · OpenDRT", s.hlg && s.dolby, hlgReady, "exp:dv") { onChange(s.copy(hdr = false, hlg = true, dolby = true, codec = MimeTypes.VIDEO_H265)) }
+            Choice("Dolby Vision · OpenDRT", plan.hlg && plan.effective.dolby, hlgReady, "exp:dv") { onChange(s.copy(hdr = false, hlg = true, dolby = true, codec = MimeTypes.VIDEO_H265)) }
     }
     Note(when {
-        s.hlg && s.dolby -> "Dolby Vision 8.4: the HLG (Rec.2100, 1000 nits) of each clip's last OpenDRT node, encoded by the phone's Dolby Vision encoder, which makes the dynamic metadata from the exported frames. Plays as HLG where there is no Dolby Vision. The preview stays SDR."
-        s.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; ungraded clips, titles and captions are converted from SDR (BT.2408, white at 75 %). 10-bit HEVC. The preview stays SDR."
-        s.hdr && s.dolby -> "Dolby Vision from the clips' own HDR (a Dolby Vision clip's HLG base, cut and edited without a grade), encoded by the phone's Dolby Vision encoder, which makes new dynamic metadata from the exported frames."
-        s.hdr -> stringResource(R.string.exportui_note_hdr)
+        plan.hlg && plan.effective.dolby -> "Dolby Vision 8.4: the HLG (Rec.2100, 1000 nits) of each clip's last OpenDRT node, encoded by the phone's Dolby Vision encoder, which makes the dynamic metadata from the exported frames. Plays as HLG where there is no Dolby Vision. The preview stays SDR."
+        plan.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; ungraded clips, titles and captions are converted from SDR (BT.2408, white at 75 %). 10-bit HEVC. The preview stays SDR."
+        plan.hdr && plan.effective.dolby -> "Dolby Vision from the clips' own HDR (a Dolby Vision clip's HLG base, cut and edited without a grade), encoded by the phone's Dolby Vision encoder, which makes new dynamic metadata from the exported frames."
+        plan.hdr -> stringResource(R.string.exportui_note_hdr)
         hdrBlocked != null -> hdrBlocked
         !hdrPossible -> stringResource(R.string.exportui_note_hdr_impossible)
         else -> stringResource(R.string.exportui_note_sdr)
