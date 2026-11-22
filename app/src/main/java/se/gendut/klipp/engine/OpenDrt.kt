@@ -29,6 +29,11 @@ import kotlin.math.sqrt
  * OpenDRT as an effect in a node: [input] = how the footage is encoded (log curve + color space), [look] and [tonescale]
  * = OpenDRT's presets, [cwp] = creative white point (0 = the look's), [grey] = mid gray luminance in nits (10 =
  * default; higher = brighter image), [display] = the display encoding.
+ *
+ * Klipp Lab: [eiShot] = the EI the clip was recorded at, [ei] = the EI it is rated at (0 = not set). The linear signal
+ * after the log decoding is scaled by [ei] / [eiShot], as rating a cinema camera's log footage at another EI. With
+ * George Kiarie's camera mods the sensor clips at 0.0072 × EI scene linear (their gamma tables are slog3(0.0072·EI·s),
+ * see his RawViewer), so the clip sits log2(EI / 25) stops over 18 % grey.
  */
 data class Drt(
     val input: String = OpenDrt.Input.SLOG3.key,
@@ -38,9 +43,17 @@ data class Drt(
     val cwpLimit: Float = 0.25f,
     val grey: Float = 10f,
     val display: Int = 0,
+    val eiShot: Int = 0,
+    val ei: Int = 0,
 ) {
+    /** The gain on the linear signal from the EIs (1 = not rated). */
+    val eiGain: Float get() = if (eiShot > 0 && ei > 0) ei.toFloat() / eiShot else 1f
+
+    /** Stops of the sensor's clip over 18 % grey at the EI in use (rated, else shot); null = no EI set. */
+    val clipStops: Float? get() = (if (ei > 0 && eiShot > 0) ei else eiShot).takeIf { it > 0 }?.let { kotlin.math.log2(it / 25f) }
+
     fun toJson(): JSONObject = JSONObject().put("in", input).put("look", look).put("ts", tonescale).put("cwp", cwp)
-        .put("cwpLm", cwpLimit.toDouble()).put("grey", grey.toDouble()).put("disp", display)
+        .put("cwpLm", cwpLimit.toDouble()).put("grey", grey.toDouble()).put("disp", display).put("eiS", eiShot).put("ei", ei)
 
     companion object {
         fun fromJson(o: JSONObject?): Drt? {
@@ -51,6 +64,7 @@ data class Drt(
                 o.optInt("look", 0).coerceIn(0, OpenDrt.LOOKS.lastIndex), o.optInt("ts", 0).coerceIn(0, OpenDrt.TONESCALE_LABELS.lastIndex),
                 o.optInt("cwp", 0).coerceIn(0, OpenDrt.WHITE_LABELS.lastIndex), o.optDouble("cwpLm", 0.25).toFloat().coerceIn(0f, 1f),
                 o.optDouble("grey", 10.0).toFloat().coerceIn(3f, 25f), o.optInt("disp", 0).coerceIn(0, OpenDrt.DISPLAY_LABELS.lastIndex),
+                o.optInt("eiS", 0).coerceIn(0, 102_400), o.optInt("ei", 0).coerceIn(0, 102_400),
             )
         }
     }
@@ -78,6 +92,9 @@ object OpenDrt {
 
         companion object { fun of(key: String) = entries.firstOrNull { it.key == key } ?: SLOG3 }
     }
+
+    /** Klipp Lab: EIs to pick from (one-third stops). */
+    val EIS = listOf(100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800)
 
     val LOOKS = listOf("Standard", "Arriba", "Sylvan", "Colorful", "Aery", "Dystopic", "Umbra")
 
@@ -367,10 +384,12 @@ object OpenDrt {
         private val lconW = (p.tn_lcon_w / 4f).let { it * it }
         private val lconSc = if (p.tn_lcon_enable) compressToeCubic(tsX0, lconM, lconW, true) / tsX0 else 1f
         private val hconP = 2f.pow(p.tn_hcon)
+        private val eiGain = drt.eiGain
 
         /** One pixel: code values in the input format (0..1) → display code values (0..1). [rgb] is overwritten. */
         fun apply(rgb: FloatArray) {
             for (i in 0..2) rgb[i] = oetf(rgb[i], input.oetf)
+            if (eiGain != 1f) for (i in 0..2) rgb[i] *= eiGain
             mul(input.gamut, rgb)
             mul(M.XYZ_TO_P3D65, rgb)
 

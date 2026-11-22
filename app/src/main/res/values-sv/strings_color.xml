@@ -15,6 +15,10 @@
     <string name="colortools_creative_white">Kreativ vitpunkt</string>
     <string name="colortools_white_limit">Vitpunktens gräns</string>
     <string name="colortools_mid_grey_nits">Mellangrått (nits)</string>
+    <string name="colortools_ei_shot">Inspelad med EI</string>
+    <string name="colortools_ei_rate">Bedömd som EI</string>
+    <string name="colortools_ei_off">Av</string>
+    <string name="colortools_ei_note">Sensorns klippning: +%1$s steg över 18 %% grått</string>
     <string name="colortools_display">Skärm</string>
     <string name="colortools_film_intro">Spektral simulering av analog film: bilden exponerar ett negativ som framkallas och kopieras på papper (diafilm skannas direkt), med korn, halation och diffusion. Lägg den sist i nodkedjan – den gör om bilden till färdig skärmbild.</string>
     <string name="colortools_film_mode_full">Hela filmen</string>

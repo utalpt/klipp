@@ -15,6 +15,10 @@
     <string name="colortools_creative_white">Creative white point</string>
     <string name="colortools_white_limit">White point limit</string>
     <string name="colortools_mid_grey_nits">Mid grey (nits)</string>
+    <string name="colortools_ei_shot">Shot at EI</string>
+    <string name="colortools_ei_rate">Rated at EI</string>
+    <string name="colortools_ei_off">Off</string>
+    <string name="colortools_ei_note">Sensor clip: +%1$s stops over 18%% grey</string>
     <string name="colortools_display">Display</string>
     <string name="colortools_film_intro">Spectral simulation of analog film: the image exposes a negative that is developed and printed on paper (slide film is scanned directly), with grain, halation and diffusion. Put it last in the node chain – it turns the image into a finished display image.</string>
     <string name="colortools_film_mode_full">Whole film</string>

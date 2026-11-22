@@ -171,4 +171,20 @@ class OpenDrtTest {
         assertEquals(1, g.chain.size)
         assertTrue(g.isNeutral)
     }
+    /** Klipp Lab: rating at twice the EI shot = twice the linear light (S-Log3 at 18 % grey and at 36 %). */
+    @Test
+    fun eiRatingScalesLinear() {
+        fun slog3(x: Double) = (420.0 + kotlin.math.log10((x + 0.01) / 0.19) * 261.5) / 1023.0
+        val rated = OpenDrt.Transform(Drt(eiShot = 800, ei = 1600))
+        val plain = OpenDrt.Transform(Drt())
+        val a = FloatArray(3) { slog3(0.18).toFloat() }.also { rated.apply(it) }
+        val b = FloatArray(3) { slog3(0.36).toFloat() }.also { plain.apply(it) }
+        for (k in 0..2) assertEquals(b[k], a[k], 1e-4f)
+        assertEquals(2f, Drt(eiShot = 800, ei = 1600).eiGain, 1e-6f)
+        assertEquals(1f, Drt(eiShot = 800).eiGain, 1e-6f)
+        // George's mods: the sensor clips at 0.0072 × EI, 5 stops over 18 % grey at EI 800
+        assertEquals(5f, Drt(eiShot = 800).clipStops!!, 1e-4f)
+        assertNull(Drt().clipStops)
+        assertEquals(Drt(eiShot = 800, ei = 1250), Drt.fromJson(Drt(eiShot = 800, ei = 1250).toJson()))
+    }
 }

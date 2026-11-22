@@ -19,6 +19,10 @@ Color and export
 - LUT import: several .cube files and .zip packs at once; a zip's folders become groups. Hold a LUT to select
   several (tap a group's name for the whole group) and delete them.
 
+- OpenDRT node: "Shot at EI" and "Rated at EI" for log footage. Rating at another EI scales the linear light by
+  rated / shot, as rating a cinema camera's log footage; with an EI set the node shows where the sensor clips (for
+  George's camera mods 0.0072 × EI scene linear: +5 stops over 18 % grey at EI 800). The 0.0072 × EI relation is from
+  George Kiarie's RawViewer.
 - Export → Dolby Vision · OpenDRT (on phones with a Dolby Vision encoder, e.g. the 17 Ultra's c2.qti.dv.encoder):
   the same HLG as "HLG · OpenDRT", encoded as Dolby Vision profile 8.4. The encoder makes the dynamic metadata from
   the exported frames, so edited and mixed clips get metadata that matches what is in the file; plays as HLG where
