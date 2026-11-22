@@ -225,6 +225,7 @@
     <string name="medialibrary_deselect">Avmarkera</string>
     <string name="medialibrary_selected_count">%1$d markerade</string>
     <string name="medialibrary_move">Flytta</string>
+    <string name="medialibrary17u_add">Lägg %1$d på tidslinjen, i den här ordningen</string>
     <string name="medialibrary_top_level">Översta nivån</string>
     <string name="medialibrary_rename">Byt namn</string>
     <string name="medialibrary_rename_folder">Byt namn på mappen</string>

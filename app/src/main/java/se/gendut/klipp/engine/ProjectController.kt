@@ -223,19 +223,7 @@ class ProjectController(
                     // names carry the date and time, so this is the order they were shot in) – no source/Insert step
                     if (se.gendut.klipp.AppPrefs.addOnImport(context)) {
                         val names = snap.media.associate { it.id to it.name }
-                        val ids = (0 until items.length()).map { items.getLong(it) }.sortedBy { names[it]?.lowercase() ?: "" }
-                        val now = engine.snapshot()
-                        val fps = now.fps
-                        val start = now.sequence?.duration ?: 0.0
-                        var at = start
-                        for (id in ids) {
-                            if (engine.tryExec("source.open", JSONObject().put("item", id)).isFailure) continue
-                            engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(at, fps)))
-                            if (engine.tryExec("source.insert", JSONObject()).isSuccess) added++
-                            at = engine.snapshot().sequence?.duration ?: at
-                        }
-                        // the playhead on the first new clip, so it shows in the monitor
-                        engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(start, fps)))
+                        added = insertAtEnd((0 until items.length()).map { items.getLong(it) }.sortedBy { names[it]?.lowercase() ?: "" })
                     }
                 }
                 refresh()
@@ -352,6 +340,42 @@ class ProjectController(
         val sub = snapshot.bins.filter { it.parent == bin }.map { it.id }
         return snapshot.media.filter { it.bin == bin }.map { it.id } + sub.flatMap { mediaInBin(it) }
     }
+
+    /**
+     * Puts media items at the end of the timeline, in the given order (whole clips, or their marked ranges), and leaves
+     * the engine's playhead on the first of them. Runs inside an undo group under the edit lock. Returns how many went in.
+     */
+    private suspend fun insertAtEnd(ids: List<Long>): Int {
+        val now = engine.snapshot()
+        val fps = now.fps
+        val start = now.sequence?.duration ?: 0.0
+        var at = start
+        var n = 0
+        for (id in ids) {
+            if (engine.tryExec("source.open", JSONObject().put("item", id)).isFailure) continue
+            engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(at, fps)))
+            if (engine.tryExec("source.insert", JSONObject()).isSuccess) n++
+            at = engine.snapshot().sequence?.duration ?: at
+        }
+        engine.tryExec("playhead.set", JSONObject().put("time", FrameTime.ticks(start, fps)))
+        return n
+    }
+
+    /** Klipp 17U: the media panel's "Add to timeline" – the selected clips at the end, in the order they were selected. */
+    fun appendToTimeline(items: List<Long>) = scope.launch { editLock.withLock {
+        var n = 0
+        try {
+            group(Str.t(R.string.projectcontroller17u_undo_add)) {
+                if (snapshot.sequence == null) engine.exec("file.newSequence", newSeqParams())
+                n = insertAtEnd(items)
+            }
+            refresh()
+            if (n > 0) state.playhead = snapshot.playhead.toFloat()
+            onMessage(Str.t(R.string.projectcontroller17u_added, n))
+        } catch (e: Exception) {
+            onMessage(e.message ?: Str.t(R.string.projectcontroller_edit_failed))
+        }
+    } }
 
     /** Insert (or overwrite) the source's marked range at the timeline playhead. */
     fun editFromSource(item: Long, atSec: Double, overwrite: Boolean, onDone: () -> Unit = {}) = scope.launch { editLock.withLock {

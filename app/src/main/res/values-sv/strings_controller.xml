@@ -11,6 +11,7 @@
         <item quantity="other">%1$d klipp importerade</item>
     </plurals>
     <string name="projectcontroller17u_added">Lagt på tidslinjen: %1$d</string>
+    <string name="projectcontroller17u_undo_add">Lägg på tidslinjen</string>
     <string name="projectcontroller_import_failed">Import misslyckades: %1$s</string>
     <string name="projectcontroller_default_media_name">Klipp</string>
     <string name="projectcontroller_set_marks_failed">Kunde inte sätta in/ut</string>

@@ -11,6 +11,7 @@
         <item quantity="other">%1$d clips imported</item>
     </plurals>
     <string name="projectcontroller17u_added">Added to the timeline: %1$d</string>
+    <string name="projectcontroller17u_undo_add">Add to timeline</string>
     <string name="projectcontroller_import_failed">Import failed: %1$s</string>
     <string name="projectcontroller_default_media_name">Clip</string>
     <string name="projectcontroller_set_marks_failed">Couldn\'t set In/Out</string>
