@@ -21,6 +21,8 @@ Color and export
 
 - New project: the frame rate chosen in the dialog is kept when the size comes from the first clip (a project created
   at 24 fps became 120 fps with a 120 fps clip).
+- Video picker with "select some" (Android 14+): a "Choose videos" button opens the system's selection again to add
+  more; before, with none chosen the picker only said no videos were found.
 - A new project's frame rate from a phone clip snaps to the nearest standard rate within 4 % (60, 120 and the other
   usual rates): a 60 fps clip whose variable rate averaged 58.6 made a 58.598 fps project, which dropped frames on export.
   The NTSC rates (59.94 …) only when the file really is on one.
