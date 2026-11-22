@@ -1,8 +1,8 @@
 # 🎬 Klipp
 
 > 🧪 **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only)
-> on the `xiaomi-17u` branch. Its focus is log video, above all from George's camera mods for the Xiaomi Ultra
-> phones, and Dolby Vision, while staying a general video editor. Built and tested on a Xiaomi 17 Ultra, not specific
+> on the `xiaomi-17u` branch. Its focus is log video from stock camera mods for the Xiaomi Ultra phones, and
+> Dolby Vision, while staying a general video editor. Built and tested on a Xiaomi 17 Ultra, not specific
 > to it. It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
 > Klipp as pull requests; issues with the fork's own features go here, not to Klipp.
 
