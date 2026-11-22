@@ -190,7 +190,7 @@ object McrawConvert {
                 ci.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).profileLevels.any { it.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10 }
         }
         for (ci in infos) {
-            val vc = ci.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).videoCapabilities
+            val vc = ci.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).videoCapabilities ?: continue
             var tw = w
             while (tw >= 1280) {
                 val th = ((tw.toLong() * h / w) / 16 * 16).toInt()
