@@ -75,6 +75,19 @@ fun McrawProbeRow(ctx: Context) {
                         converting = false
                     }
                 }, modifier = Modifier.testTag("set:mcrawConvert")) { Text("Convert to S-Log3") }
+                // a half-size draft (no demosaic): how fast a playback develop can be
+                FlatTextButton(onClick = {
+                    val uri = lastUri ?: return@FlatTextButton
+                    result = null; converting = true; progress = 0f
+                    scope.launch {
+                        converted = withContext(Dispatchers.Default) {
+                            se.gendut.klipp.engine.McrawConvert.convert(ctx, uri, draft = true) { progress = it }.also { r ->
+                                runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
+                            }
+                        }
+                        converting = false
+                    }
+                }, modifier = Modifier.testTag("set:mcrawDraft")) { Text("Draft") }
             },
             title = { Text("MCRAW test") },
             text = {

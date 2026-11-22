@@ -38,7 +38,11 @@ object McrawConvert {
 
     class Result(val uri: Uri?, val summary: String, val log: String)
 
-    fun convert(ctx: Context, src: Uri, progress: (Float) -> Unit): Result {
+    /**
+     * [draft]: half size, each 2×2 CFA block one pixel (no demosaic) – a quick develop for playback; the full one is
+     * made for the export.
+     */
+    fun convert(ctx: Context, src: Uri, draft: Boolean = false, progress: (Float) -> Unit): Result {
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
         if (!Mcraw.available) return Result(null, "MCRAW library not loaded", "")
@@ -69,7 +73,7 @@ object McrawConvert {
             if (ch != hh) line("picture height: $ch of $hh (the rest is padding)")
 
             // the encoder's size: the picture's own, else the largest of the same shape it takes
-            val (ow, oh, codecName) = pickSize(w, ch, fps) ?: return Result(null, "No HEVC 10-bit encoder for this size", log.toString())
+            val (ow, oh, codecName) = (if (draft) pickSize(w / 2, ch / 2, fps) else pickSize(w, ch, fps)) ?: return Result(null, "No HEVC 10-bit encoder for this size", log.toString())
             line("encoder: $codecName  ${ow}x$oh")
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
@@ -83,7 +87,7 @@ object McrawConvert {
             // output file in Movies/Klipp Lab
             val base = name.substringBeforeLast('.')
             val values = ContentValues().apply {
-                put(MediaStore.Video.Media.DISPLAY_NAME, "${base}_SLog3.mp4")
+                put(MediaStore.Video.Media.DISPLAY_NAME, "${base}_SLog3${if (draft) "_draft" else ""}.mp4")
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                 put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Klipp Lab")
                 put(MediaStore.Video.Media.IS_PENDING, 1)
@@ -168,7 +172,7 @@ object McrawConvert {
 
                 val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
-                    gl.setup(cfa, c, camToOut, headroom(ei))
+                    gl.setup(cfa, c, camToOut, headroom(ei), draft)
                     for (k in 0 until n) {
                         val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
@@ -195,7 +199,7 @@ object McrawConvert {
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
+                "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
@@ -344,7 +348,7 @@ object McrawConvert {
             check(EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) { "eglMakeCurrent failed" }
         }
 
-        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray, headroom: Float) {
+        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray, headroom: Float, draft: Boolean) {
             val pattern = when (cfa.lowercase()) { "bggr" -> "BGGR"; "grbg" -> "GRBG"; "gbrg" -> "GBRG"; else -> "RGGB" }
             var greens = 0
             for (p in 0 until 4) when (pattern[p]) {
@@ -366,6 +370,7 @@ object McrawConvert {
             GLES30.glUniform2i(loc("size"), w, ch)
             GLES30.glUniform2i(loc("full"), w, h)
             GLES30.glUniform2f(loc("scale"), w / ow.toFloat(), ch / oh.toFloat())
+            GLES30.glUniform1i(loc("draft"), if (draft) 1 else 0)
             GLES30.glUniformMatrix3fv(loc("camToOut"), 1, true, camToOut, 0)
             GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, headroom.toDouble()).toFloat())
             GLES30.glViewport(0, 0, ow, oh)
@@ -490,6 +495,7 @@ uniform ivec2 size;   // the picture (rows from the top)
 uniform ivec2 full;   // the whole frame: the lens shading map covers it
 uniform ivec2 grid;
 uniform int useShade;
+uniform int draft;
 uniform vec2 scale;
 uniform vec4 black;
 uniform float white;
@@ -539,25 +545,39 @@ void main() {
     if (scale != vec2(1.0)) p = ivec2((floor(pos * vec2(size) / scale) + 0.5) * scale);
     p = clamp(p, ivec2(0), size - 1);
     vec4 sh = shading4(p);
-    // Malvar–He–Cutler demosaic (gradient-corrected bilinear, 5×5)
-    float c  = value(p, sh);
-    float h1 = value(p + ivec2(-1, 0), sh) + value(p + ivec2(1, 0), sh);
-    float v1 = value(p + ivec2(0, -1), sh) + value(p + ivec2(0, 1), sh);
-    float h2 = value(p + ivec2(-2, 0), sh) + value(p + ivec2(2, 0), sh);
-    float v2 = value(p + ivec2(0, -2), sh) + value(p + ivec2(0, 2), sh);
-    float dg = value(p + ivec2(-1, -1), sh) + value(p + ivec2(1, -1), sh) + value(p + ivec2(-1, 1), sh) + value(p + ivec2(1, 1), sh);
-    int cc = colorOf(p);
     vec3 rgb;
-    if (cc == 1) {
-        // green site: the colour beside it and the colour above/below it
-        float sideC = (5.0 * c + 4.0 * h1 - h2 + 0.5 * v2 - dg) / 8.0;
-        float vertC = (5.0 * c + 4.0 * v1 - v2 + 0.5 * h2 - dg) / 8.0;
-        int side = colorOf(p + ivec2(1, 0));
-        rgb = side == 0 ? vec3(sideC, c, vertC) : vec3(vertC, c, sideC);
+    if (draft == 1) {
+        // draft (half size): each 2×2 CFA block is one pixel, no demosaic
+        ivec2 q = (p / 2) * 2;
+        vec3 s3 = vec3(0.0);
+        vec3 n3 = vec3(0.0);
+        for (int k = 0; k < 4; k++) {
+            ivec2 o = q + ivec2(k & 1, k >> 1);
+            int oc = colorOf(o);
+            float v = value(o, sh);
+            if (oc == 0) { s3.r += v; n3.r += 1.0; } else if (oc == 1) { s3.g += v; n3.g += 1.0; } else { s3.b += v; n3.b += 1.0; }
+        }
+        rgb = s3 / max(n3, vec3(1.0));
     } else {
-        float g = (4.0 * c + 2.0 * (h1 + v1) - (h2 + v2)) / 8.0;
-        float other = (6.0 * c + 2.0 * dg - 1.5 * (h2 + v2)) / 8.0;
-        rgb = cc == 0 ? vec3(c, g, other) : vec3(other, g, c);
+        // Malvar–He–Cutler demosaic (gradient-corrected bilinear, 5×5)
+        float c  = value(p, sh);
+        float h1 = value(p + ivec2(-1, 0), sh) + value(p + ivec2(1, 0), sh);
+        float v1 = value(p + ivec2(0, -1), sh) + value(p + ivec2(0, 1), sh);
+        float h2 = value(p + ivec2(-2, 0), sh) + value(p + ivec2(2, 0), sh);
+        float v2 = value(p + ivec2(0, -2), sh) + value(p + ivec2(0, 2), sh);
+        float dg = value(p + ivec2(-1, -1), sh) + value(p + ivec2(1, -1), sh) + value(p + ivec2(-1, 1), sh) + value(p + ivec2(1, 1), sh);
+        int cc = colorOf(p);
+        if (cc == 1) {
+            // green site: the colour beside it and the colour above/below it
+            float sideC = (5.0 * c + 4.0 * h1 - h2 + 0.5 * v2 - dg) / 8.0;
+            float vertC = (5.0 * c + 4.0 * v1 - v2 + 0.5 * h2 - dg) / 8.0;
+            int side = colorOf(p + ivec2(1, 0));
+            rgb = side == 0 ? vec3(sideC, c, vertC) : vec3(vertC, c, sideC);
+        } else {
+            float g = (4.0 * c + 2.0 * (h1 + v1) - (h2 + v2)) / 8.0;
+            float other = (6.0 * c + 2.0 * dg - 1.5 * (h2 + v2)) / 8.0;
+            rgb = cc == 0 ? vec3(c, g, other) : vec3(other, g, c);
+        }
     }
     rgb = max(rgb, vec3(0.0));
     // clipped highlights stay neutral: no channel above the clip of the least-gained colour (with the lens shading
