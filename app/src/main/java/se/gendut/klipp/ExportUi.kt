@@ -205,7 +205,7 @@ fun ExportOptions(
         !hdrPossible -> stringResource(R.string.exportui_note_hdr_impossible)
         else -> stringResource(R.string.exportui_note_sdr)
     })
-    if (!s.hlg && hlgWhyNot != null) Note("HLG · OpenDRT: $hlgWhyNot")
+    if (!plan.hlg && hlgWhyNot != null) Note("HLG · OpenDRT: $hlgWhyNot")
 
         }
         else -> {
