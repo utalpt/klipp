@@ -158,6 +158,14 @@ object EncoderCaps {
         EncoderUtil.getSupportedEncoders(mime).any { EncoderUtil.isSizeSupported(it, mime, w, h) }
     }.getOrDefault(false)
 
+    /**
+     * Klipp Lab: the highest bitrate (Mbit/s) the phone's first encoder for [mime] takes – Media3 clamps the bitrate to
+     * it (the 17 Ultra's Dolby Vision encoder: 160), so the export dialog shows what is really asked for. null = unknown.
+     */
+    fun maxMbps(mime: String): Double? = runCatching {
+        EncoderUtil.getSupportedEncoders(mime).firstOrNull()?.let { EncoderUtil.getSupportedBitrateRange(it, mime).upper / 1e6 }
+    }.getOrNull()
+
     /** Klipp Lab: can the phone encode Dolby Vision 8.4 (an HLG base) – an encoder for video/dolby-vision with HLG? */
     val dolbyVisionSupported: Boolean by lazy {
         runCatching {

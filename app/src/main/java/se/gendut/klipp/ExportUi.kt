@@ -246,7 +246,11 @@ fun ExportDialog(
     val ow = plan.width
     val oh = plan.height
     // the estimate and the summary are for what is actually made (the codec may have been swapped)
-    val mb = plan.effective.estimateMb(seqW, seqH, projectFps, seconds)
+    // Klipp Lab: the bitrate as the encoder takes it (Media3 clamps it to the encoder's highest, see EncoderCaps.maxMbps)
+    val capMbps = remember(plan.effective.codec) { se.gendut.klipp.engine.EncoderCaps.maxMbps(plan.effective.codec) }
+    val askedMbps = plan.effective.videoMbps(seqW, seqH, projectFps)
+    val realMbps = capMbps?.let { minOf(askedMbps, it) } ?: askedMbps
+    val mb = plan.effective.copy(bitrateMbps = realMbps.toFloat()).estimateMb(seqW, seqH, projectFps, seconds)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.exportui_title)) },
@@ -260,7 +264,7 @@ fun ExportDialog(
                 Text(
                     "${ow}×$oh · ${stringResource(R.string.exportui_fps_value, fpsLabel(plan.fps))} · ${codecName(plan.effective.codec)}" +
                         (if (plan.hlg && plan.effective.dolby) "" else if (plan.hlg) " HLG" else if (plan.hdr) " HDR" else if (plan.tenBit) " 10-bit" else "") + " · " +
-                        (if (s.bitrateMbps > 0f) mbpsLabel(s.bitrateMbps.toDouble()) else stringResource(R.string.exportui_auto_lower)) + " · ≈ ${sizeLabel(mb)}",
+                        (if (s.bitrateMbps > 0f) mbpsLabel(realMbps) + (if (realMbps < askedMbps - 0.5) " (max)" else "") else stringResource(R.string.exportui_auto_lower)) + " · ≈ ${sizeLabel(mb)}",
                     color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).testTag("exp:summary"),
                 )

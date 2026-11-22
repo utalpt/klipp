@@ -24,6 +24,9 @@ Color and export
   The NTSC rates (59.94 …) only when the file really is on one.
 - Export → Dolby Vision · keep HDR: Dolby Vision clips (their HLG base) cut and edited without a grade come out as
   Dolby Vision again, with new dynamic metadata made by the phone's encoder from the exported frames.
+- Export dialog: the bitrate shown is the one the encoder takes – Media3 caps it at the encoder's highest (the 17 Ultra's
+  Dolby Vision encoder: 160 Mbps), shown as "160 Mbps (max)" with the size estimate to match. For Dolby Vision use
+  CBR: in VBR the encoder spent 31 Mb/s on a calm 4K60 clip, in CBR 125 Mb/s.
 - EI per clip (Color → the "EI" chip before the nodes, or the grid → Clip grade): the clip's log curve, the EI it was
   shot at and the EI it is rated at. Applied before all the clip's nodes: the log is decoded, the light scaled by
   rated / shot (as rating a cinema camera's log footage) and encoded again, so every node, LUT and OpenDRT gets the
