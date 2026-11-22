@@ -55,7 +55,7 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
         for (v in McrawFolder17u.EIS) ToggleChip(if (v == 0) "Auto" + (if (i.auto) " (${i.ei})" else "") else "$v", ei == v, { ei = v }, Modifier.help17u("Develop at EI", Help17uText.EI).testTag("raw:ei$v"))
     }
     val outs = OpenDrt.Input.entries.filter { it != OpenDrt.Input.REC709 }
-    Box(Modifier.help17u("Output", Help17uText.OUT).padding(horizontal = 14.dp, vertical = 4.dp)) {
+    Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
         DropField("Output (log curve / gamut)", outs.map { Opt(it.key, it.label, key = it.key) }, out, "raw:out") { out = it }
     }
     // a clip developed into another output at import: its input follows the develop (once, no undo step)

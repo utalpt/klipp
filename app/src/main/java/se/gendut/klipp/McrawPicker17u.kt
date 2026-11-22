@@ -114,7 +114,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
     }
     var outKey by remember { mutableStateOf(McrawFolder17u.out(ctx)) }
     val outs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
-    DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out", Modifier.help17u("Develop into", Help17uText.OUT)) { outKey = it; McrawFolder17u.setOut(ctx, it) }
+    DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out") { outKey = it; McrawFolder17u.setOut(ctx, it) }
     if (tree == null) {
         Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Pick MotionCam's folder once (usually Documents/MotionCam): its .mcraw files show here, developed to S-Log3 when imported.",

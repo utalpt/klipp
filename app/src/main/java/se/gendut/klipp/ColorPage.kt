@@ -824,18 +824,12 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
     val asShot = stringResource(R.string.colorpage17u_wb_as_shot)
     val ref = se.gendut.klipp.engine.InputEi.WB_REF.toFloat()
     fun kOf(v: Float) = ((v / 50f).roundToInt() * 50).let { if (it == ref.toInt()) 0 else it }
-    val tempLabel = stringResource(R.string.colorpage17u_wb_temp)
-    Box(Modifier.help17u(tempLabel, Help17uText.TEMP)) {
-        PropSlider(tempLabel, if (ei.temp > 0) ei.temp.toFloat() else ref, 2000f, 12000f, ref,
-            { kOf(it).let { k -> if (k == 0) asShot else "$k K" } }, "clipInput:temp", lane = false,
-            onLive = { live(ei.copy(temp = kOf(it))) }) { set(ei.copy(temp = kOf(it))) }
-    }
-    val tintLabel = stringResource(R.string.colorpage17u_wb_tint)
-    Box(Modifier.help17u(tintLabel, Help17uText.TINT)) {
-        PropSlider(tintLabel, ei.tint.toFloat(), -100f, 100f, 0f,
-            { "%+d".format(it.roundToInt()) }, "clipInput:tint", lane = false,
-            onLive = { live(ei.copy(tint = it.roundToInt())) }) { set(ei.copy(tint = it.roundToInt())) }
-    }
+    PropSlider(stringResource(R.string.colorpage17u_wb_temp), if (ei.temp > 0) ei.temp.toFloat() else ref, 2000f, 12000f, ref,
+        { kOf(it).let { k -> if (k == 0) asShot else "$k K" } }, "clipInput:temp", lane = false,
+        onLive = { live(ei.copy(temp = kOf(it))) }) { set(ei.copy(temp = kOf(it))) }
+    PropSlider(stringResource(R.string.colorpage17u_wb_tint), ei.tint.toFloat(), -100f, 100f, 0f,
+        { "%+d".format(it.roundToInt()) }, "clipInput:tint", lane = false,
+        onLive = { live(ei.copy(tint = it.roundToInt())) }) { set(ei.copy(tint = it.roundToInt())) }
     McrawRawSection17u(gs, clips, current) // Klipp Lab: a MotionCam clip's develop (EI, output), changeable any time
     if (g.ei != null && clips.size > 1) ToggleChip(stringResource(R.string.colorpage_input_all), false, {
         haptics.confirm()

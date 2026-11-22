@@ -49,7 +49,8 @@ fun <T> DropField(
     var open by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
     val cur = options.firstOrNull { it.value == selected }
-    Column(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    val help = Help17uText.of(tag) // Klipp Lab: long-press help
+    Column(modifier.then(if (help != null) Modifier.help17u(label ?: "", help) else Modifier).fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         if (label != null) Text(label, color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
         Box {
             val shape = RoundedCornerShape(12.dp)

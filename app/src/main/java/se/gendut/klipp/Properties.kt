@@ -120,7 +120,8 @@ fun PropSlider(
     Column(Modifier.fillMaxWidth().padding(horizontal = LocalSliderInset.current)) {
         // the name on the left and the value on the right, above the track (the track gets the whole width)
         val nav = anim != null && lane && anim.animated
-        Row(Modifier.fillMaxWidth().height(if (nav) 34.dp else if (anim != null) 28.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        val help = Help17uText.of(tag) // Klipp Lab: long-press help on the name
+        Row(Modifier.fillMaxWidth().then(if (help != null) Modifier.help17u(label, help) else Modifier).height(if (nav) 34.dp else if (anim != null) 28.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
             if (anim != null) Stopwatch(anim)
             Text(
                 label, color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,

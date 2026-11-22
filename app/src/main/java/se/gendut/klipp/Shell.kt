@@ -547,6 +547,8 @@ internal fun DockAction(item: DockItem, modifier: Modifier = Modifier) {
         modifier.height(64.dp).pressPop(src, 0.88f)
             .then(if (item.tag != null) Modifier.testTag(item.tag) else Modifier)
             .semantics { selected = item.primary; item.desc?.let { contentDescription = it } }
+            // Klipp Lab: long-press help (the help text, else the action's description)
+            .then((Help17uText.of(item.tag) ?: item.desc)?.let { Modifier.help17u(item.label, it) } ?: Modifier)
             .clickable(interactionSource = src, indication = null) { if (item.strong) haptics.heavy() else haptics.press(); item.onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
