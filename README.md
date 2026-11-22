@@ -26,7 +26,10 @@
   project), and the rate chosen for a new project is kept.
 - 🎨 Files without a colour transfer keep their matrix and range.
 - ✅ Select several projects and delete them at once.
-- 📐 Resizable split in landscape, compact interface size; the selection box scrolls the timeline at the edges.
+- 🔲 The selection box scrolls the timeline at the edges.
+- 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
+  size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
+  landscape, drag the grip between the picture and the timeline (double tap to reset).
 
 Everything the fork changes, entry by entry: [CHANGELOG-17U.md](CHANGELOG-17U.md).
 
