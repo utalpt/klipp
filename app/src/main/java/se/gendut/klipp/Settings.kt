@@ -109,6 +109,10 @@ object AppPrefs {
     fun base(c: Context): Base = runCatching { Base.valueOf(p(c).getString("base", null) ?: "") }.getOrDefault(Base.DARK)
     fun setBase(c: Context, b: Base) { p(c).edit().putString("base", b.name).apply(); K.base = b }
 
+    /** Klipp 17U: the monitor's height per picture shape (key: width/height, 3 decimals); 0 = fit the shape. */
+    fun monitorHeightFor(c: Context, shape: String): Float = p(c).getFloat("monitorH17u_$shape", 0f)
+    fun setMonitorHeightFor(c: Context, shape: String, dp: Float) { p(c).edit().putFloat("monitorH17u_$shape", dp).apply() }
+
     /** Klipp 17U: imported clips go straight to the end of the timeline (no source/Insert step). */
     fun addOnImport(c: Context): Boolean = p(c).getBoolean("addOnImport17u", true)
     fun setAddOnImport(c: Context, on: Boolean) { p(c).edit().putBoolean("addOnImport17u", on).apply() }
