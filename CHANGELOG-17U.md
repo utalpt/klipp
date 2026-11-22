@@ -28,6 +28,8 @@ Import and timeline
 - Imported clips go straight to the end of the timeline (Settings → Timeline, on by default here), in the order
   picked, or in name order (shooting order) from the files app.
 - Media panel: with clips selected, "Add N to the timeline, in this order", each selected card numbered.
+- Timeline selection box (hold on an empty area and drag): near the left or right edge the timeline scrolls on its
+  own, so the box reaches clips off screen.
 
 Layout
 - Full screen: status and navigation bars hidden (swipe from the edge to see them); the top bar moves up to just

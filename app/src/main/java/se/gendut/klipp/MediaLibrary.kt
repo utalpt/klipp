@@ -188,7 +188,7 @@ fun MediaSheet(
                     if (picked.isNotEmpty() && pickedBins.isEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
                         PillButton(stringResource(R.string.medialibrary17u_add, picked.size), {
                             haptics.confirm(); lib.appendToTimeline(picked.toList()); clearPick(); onClose()
-                        }, filled = true, modifier = Modifier.fillMaxWidth().testTag("mediaAdd"))
+                        }, filled = true, on = true, modifier = Modifier.fillMaxWidth().testTag("mediaAdd"))
                     }
                 } else {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

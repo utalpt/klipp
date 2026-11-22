@@ -166,7 +166,7 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
         if (picked.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             PillButton(stringResource(R.string.videopicker17u_clear), { picked = emptyList() }, filled = false)
             Spacer(Modifier.size(10.dp))
-            PillButton(stringResource(R.string.videopicker17u_import, picked.size), { haptics.confirm(); onImport(picked) }, filled = true,
+            PillButton(stringResource(R.string.videopicker17u_import, picked.size), { haptics.confirm(); onImport(picked) }, filled = true, on = true,
                 modifier = Modifier.weight(1f).testTag("videoPicker:import"))
         }
     }
