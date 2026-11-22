@@ -83,6 +83,10 @@ object McrawConvert {
             val outPfd = ctx.contentResolver.openFileDescriptor(outUri, "rw") ?: return Result(null, "Could not open the output file", log.toString())
 
             val tStart = System.nanoTime()
+            // the sound: AAC, encoded first (it is small), written once the muxer starts
+            val sound = runCatching { encodeAudio(h, info.optInt("audioRate"), info.optInt("audioChannels"), t0ns) }
+                .onFailure { line("sound: failed – $it") }.getOrNull()
+            if (sound != null) line("sound: ${sound.samples.size} AAC frames, starts at ${"%.3f".format(sound.offsetUs / 1e6)} s")
             val bytes = w * hh * 2
             // decoded frames, in order, from a second thread (three buffers in flight)
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
@@ -135,7 +139,12 @@ object McrawConvert {
                         val i = codec.dequeueOutputBuffer(info2, if (end) 10_000 else 0)
                         when {
                             i == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!end) return
-                            i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> { track = muxer.addTrack(codec.outputFormat); muxer.start() }
+                            i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                                track = muxer.addTrack(codec.outputFormat)
+                                val at = sound?.let { muxer.addTrack(it.format) }
+                                muxer.start()
+                                if (sound != null && at != null) for ((data, bi) in sound.samples) muxer.writeSampleData(at, ByteBuffer.wrap(data), bi)
+                            }
                             i >= 0 -> {
                                 val ob = codec.getOutputBuffer(i)!!
                                 if (info2.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) info2.size = 0
@@ -176,7 +185,7 @@ object McrawConvert {
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC, no sound yet. In Klipp: input Sony S-Log3 / S-Gamut3, sensor clip at EI 800."
+                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3, sensor clip at EI 800."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
@@ -185,6 +194,67 @@ object McrawConvert {
         } finally {
             Mcraw.close(h); pfd.close()
         }
+    }
+
+    private class Sound(val format: MediaFormat, val samples: List<Pair<ByteArray, MediaCodec.BufferInfo>>, val offsetUs: Long)
+
+    /**
+     * The file's sound as AAC (256 kb/s), timed against the first frame ([t0ns], the frames' clock). Sound before the
+     * first frame is left out; when the clocks don't match (more than 2 s apart) it starts with the picture. Null when
+     * the file has none.
+     */
+    private fun encodeAudio(h: Long, rate: Int, channels: Int, t0ns: Long): Sound? {
+        if (rate <= 0 || channels <= 0) return null
+        val (pcm, startNs) = Mcraw.audio(h) ?: return null
+        var offsetUs = (startNs - t0ns) / 1000
+        if (kotlin.math.abs(offsetUs) > 2_000_000) offsetUs = 0
+        var first = 0 // first sample frame to use
+        if (offsetUs < 0) { first = (-offsetUs * rate / 1_000_000).toInt(); offsetUs = 0 }
+        val frames = pcm.size / channels
+        if (first >= frames) return null
+        val fmt = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, rate, channels).apply {
+            setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+            setInteger(MediaFormat.KEY_BIT_RATE, 256_000)
+            setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384)
+        }
+        val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+        codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        codec.start()
+        val out = ArrayList<Pair<ByteArray, MediaCodec.BufferInfo>>()
+        var outFormat: MediaFormat? = null
+        var pos = first
+        var inputDone = false
+        val bi = MediaCodec.BufferInfo()
+        try {
+            while (true) {
+                if (!inputDone) {
+                    val ii = codec.dequeueInputBuffer(10_000)
+                    if (ii >= 0) {
+                        val ib = codec.getInputBuffer(ii)!!.order(ByteOrder.LITTLE_ENDIAN)
+                        val n = minOf(frames - pos, ib.capacity() / (2 * channels))
+                        val pts = offsetUs + (pos - first).toLong() * 1_000_000 / rate
+                        if (n <= 0) {
+                            codec.queueInputBuffer(ii, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM); inputDone = true
+                        } else {
+                            ib.clear(); ib.asShortBuffer().put(pcm, pos * channels, n * channels)
+                            codec.queueInputBuffer(ii, 0, n * channels * 2, pts, 0); pos += n
+                        }
+                    }
+                }
+                val oi = codec.dequeueOutputBuffer(bi, 10_000)
+                if (oi == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) outFormat = codec.outputFormat
+                else if (oi >= 0) {
+                    if (bi.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && bi.size > 0) {
+                        val ob = codec.getOutputBuffer(oi)!!
+                        val data = ByteArray(bi.size); ob.position(bi.offset); ob.get(data)
+                        out += data to MediaCodec.BufferInfo().apply { set(0, bi.size, bi.presentationTimeUs, bi.flags) }
+                    }
+                    codec.releaseOutputBuffer(oi, false)
+                    if (bi.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                }
+            }
+        } finally { codec.stop(); codec.release() }
+        return outFormat?.let { Sound(it, out, offsetUs) }
     }
 
     /** The encoder and size: HEVC Main10 with surface input, the file's size or the largest of the same shape. */

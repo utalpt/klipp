@@ -25,6 +25,8 @@ struct Handle {
     std::unique_ptr<motioncam::Decoder> decoder;
     std::vector<uint8_t> data;
     nlohmann::json meta;
+    std::vector<int16_t> audio;
+    int64_t audioStart = 0;
     std::string error;
     ~Handle() {
         decoder.reset();
@@ -140,6 +142,32 @@ JNIEXPORT jint JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeLastLitRow(JNIEnv
         for (int x = 0; x < w; x += 7) if (row[x] > 72) return y;
     }
     return -1;
+}
+
+/** Loads all the sound (interleaved 16-bit) into the handle. Returns the sample count (all channels), or -1. */
+JNIEXPORT jlong JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeLoadAudio(JNIEnv*, jclass, jlong hp) {
+    auto* h = get(hp);
+    try {
+        std::vector<motioncam::AudioChunk> chunks;
+        h->decoder->loadAudio(chunks);
+        h->audio.clear();
+        h->audioStart = chunks.empty() ? 0 : chunks.front().first;
+        for (auto& c : chunks) h->audio.insert(h->audio.end(), c.second.begin(), c.second.end());
+        return (jlong) h->audio.size();
+    } catch (const std::exception& e) {
+        LOGE("audio: %s", e.what());
+        return -1;
+    }
+}
+
+/** Timestamp (ns, the frames' clock) of the first sound chunk. */
+JNIEXPORT jlong JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeAudioStart(JNIEnv*, jclass, jlong hp) { return get(hp)->audioStart; }
+
+/** Copies the loaded sound into [out] (at most its length). */
+JNIEXPORT void JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeAudioCopy(JNIEnv* env, jclass, jlong hp, jshortArray out) {
+    auto* h = get(hp);
+    jsize n = std::min((jsize) h->audio.size(), env->GetArrayLength(out));
+    env->SetShortArrayRegion(out, 0, n, h->audio.data());
 }
 
 /** Bytes in the last decoded frame (expected width × height × 2). */

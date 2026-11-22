@@ -24,6 +24,18 @@ object Mcraw {
     @JvmStatic private external fun nativePreview(h: Long, out: IntArray, w: Int, h2: Int): Boolean
     @JvmStatic private external fun nativeDecodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String?
     @JvmStatic private external fun nativeLastLitRow(h: Long): Int
+    @JvmStatic private external fun nativeLoadAudio(h: Long): Long
+    @JvmStatic private external fun nativeAudioStart(h: Long): Long
+    @JvmStatic private external fun nativeAudioCopy(h: Long, out: ShortArray)
+
+    /** All the file's sound, interleaved 16-bit, and the time (ns, the frames' clock) of its first sample; null when none. */
+    internal fun audio(h: Long): Pair<ShortArray, Long>? {
+        val n = nativeLoadAudio(h)
+        if (n <= 0 || n > Int.MAX_VALUE) return null
+        val out = ShortArray(n.toInt())
+        nativeAudioCopy(h, out)
+        return out to nativeAudioStart(h)
+    }
 
     // for McrawConvert
     internal fun open(fd: Int): Long = nativeOpen(fd)
