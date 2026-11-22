@@ -20,6 +20,8 @@
 - 🎚️ **EI per clip:** the EI a log clip was shot at and the EI it is rated at, applied before all nodes, LUTs and
   OpenDRT; for the 17 Ultra mods also where the sensor clips (the 0.0072 × EI relation from George Kiarie's
   RawViewer).
+- 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
+  linear light before all nodes, as in a raw developer – live while dragging.
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
 - 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
@@ -29,6 +31,11 @@
 - 🎨 Files without a colour transfer keep their matrix and range.
 - ✅ Select several projects and delete them at once.
 - 🔲 The selection box scrolls the timeline at the edges.
+- 🧲 **Close gaps:** hold a track's header → Close gaps, or Close gap beside Delete for a selected clip – the clip
+  moves back to the one before it, linked clips follow.
+- 💾 **Storage warning:** Settings → Playback → "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off);
+  opening a project then says what the proxies, cache, renders and freeze frames take.
+- ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
   size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
   landscape, drag the grip between the picture and the timeline (double tap to reset).
