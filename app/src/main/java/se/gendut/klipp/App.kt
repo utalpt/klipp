@@ -1031,7 +1031,7 @@ private fun KlippAppContent(
         } else {
         if (landscape) {
             // landscape: picture (and source) on the left, the modes with the timeline on the right
-            Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            Row(Modifier.fillMaxSize().safeArea17u()) {
                 Column(Modifier.weight(0.46f).fillMaxHeight()) {
                     topBar()
                     Column(Modifier.weight(1f)) { TopArea(fill = true, monitorMod = Modifier.fillMaxWidth().weight(1f)) }
@@ -1043,7 +1043,7 @@ private fun KlippAppContent(
                 }
             }
         } else {
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        Column(Modifier.fillMaxSize().safeArea17u()) {
             topBar()
             TopArea(fill = false, monitorMod = Modifier.fillMaxWidth().height(monitorH.coerceIn(MIN_MONITOR_H, maxMonitorH.coerceAtLeast(MIN_MONITOR_H))))
             if (sourceMedia == null && !state.typingInPanel) MonitorHandle(

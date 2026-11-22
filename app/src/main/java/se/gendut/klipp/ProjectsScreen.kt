@@ -246,7 +246,7 @@ fun ProjectsScreen(backend: ProjectsBackend, onSettings: (() -> Unit)? = null, o
     androidx.activity.compose.BackHandler(query != null) { query = null }
     // (the empty pointer input keeps touches on the page's bare parts from reaching the editor under it)
     Box(Modifier.fillMaxSize().background(K.Bg).pointerInput(Unit) {}.testTag("projects")) {
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        Column(Modifier.fillMaxSize().safeArea17u()) {
             Row(
                 Modifier.fillMaxWidth().height(64.dp).padding(start = 20.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
