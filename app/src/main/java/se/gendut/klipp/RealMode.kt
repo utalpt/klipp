@@ -584,7 +584,9 @@ private class OpenVideos : ActivityResultContracts.OpenMultipleDocuments() {
         }
 }
 
-fun videoRequest() = arrayOf("video/*")
+// Klipp Lab: MotionCam .mcraw files too (the files app lists them as application/octet-stream); they are developed
+// into an S-Log3 clip on import (McrawConvert)
+fun videoRequest() = arrayOf("video/*", "application/octet-stream")
 
 // ------------------------------------------------------------------ source monitor
 

@@ -271,7 +271,16 @@ private fun KlippAppContent(
     // release the source decoder only when the source is actually closed (not when the phone rotates)
     LaunchedEffect(sourceMedia) { if (sourceMedia == null) sourcePlayback?.close() }
     // Klipp Lab: with "add to the timeline on import" the clips are on the timeline already – the media panel stays shut
-    val picker = rememberVideoPicker { uris -> controller?.import(uris); if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true }
+    // Klipp Lab: a picked .mcraw is developed into an S-Log3 clip first (McrawConvert), then imported with the rest
+    var mcrawProgress by remember { mutableStateOf<String?>(null) }
+    val picker = rememberVideoPicker { picked ->
+        scope.launch {
+            val uris = importMcraw17u(context, picked) { mcrawProgress = it }
+            mcrawProgress = null
+            controller?.import(uris)
+            if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
+        }
+    }
     // Klipp Lab: Klipp's own video picker (previews of log video, newest first); its "Files app" opens the system one
     var videoPicker by remember { mutableStateOf(false) }
     fun openImport() { videoPicker = true }
@@ -1214,6 +1223,9 @@ private fun KlippAppContent(
             )
         }
 
+        mcrawProgress?.let { text ->
+            androidx.compose.material3.AlertDialog(onDismissRequest = {}, confirmButton = {}, title = { Text("MCRAW") }, text = { Text(text) })
+        }
         MessageHost(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 70.dp), toaster = toaster, layer = 0)
     }
     }

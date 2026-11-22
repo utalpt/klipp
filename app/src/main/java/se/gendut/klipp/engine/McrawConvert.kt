@@ -23,12 +23,12 @@ import java.nio.ByteOrder
 import java.util.concurrent.ArrayBlockingQueue
 
 /**
- * Klipp Lab: develops a MotionCam .mcraw into an S-Log3 / S-Gamut3 clip (10-bit HEVC, BT.2020, limited range) that
- * Klipp then edits like any log clip (input "Sony S-Log3 / S-Gamut3", EI and grade as usual).
+ * Klipp Lab: develops a MotionCam .mcraw into an S-Log3 / S-Gamut3.Cine clip (10-bit HEVC, BT.2020, limited range) that
+ * Klipp then edits like any log clip (its default input, "Sony S-Log3 / S-Gamut3.Cine": no setting to change).
  *
  * Per frame, on the GPU: the frame's own black level, the lens shading map (MotionCam doesn't bake it in), the as-shot
  * white balance, a bilinear demosaic, the camera's ForwardMatrix1 (ColorMatrix1 when there is none) to XYZ, Bradford
- * D50 → D65, S-Gamut3 and the S-Log3 curve. The sensor's clip lands [HEADROOM] stops over 18 % grey (as S-Log3 at
+ * D50 → D65, S-Gamut3.Cine and the S-Log3 curve. The sensor's clip lands [HEADROOM] stops over 18 % grey (as S-Log3 at
  * EI 800); clipped highlights stay neutral. The frames are decoded on a second thread while the GPU and the encoder
  * work. First version: picture only (no sound yet), the file's own size when the encoder takes it.
  */
@@ -68,7 +68,7 @@ object McrawConvert {
 
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff)
-            line("cfa $cfa  camera → S-Gamut3: ${camToOut.joinToString { "%.4f".format(it) }}")
+            line("cfa $cfa  camera → S-Gamut3.Cine: ${camToOut.joinToString { "%.4f".format(it) }}")
 
             // output file in Movies/Klipp Lab
             val base = name.substringBeforeLast('.')
@@ -185,7 +185,7 @@ object McrawConvert {
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3, sensor clip at EI 800."
+                "Movies/Klipp Lab/${base}_SLog3.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), sensor clip at EI 800."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
@@ -280,13 +280,13 @@ object McrawConvert {
 
     private fun arr(o: JSONObject, key: String): FloatArray? = o.optJSONArray(key)?.let { a -> FloatArray(a.length()) { a.getDouble(it).toFloat() } }
 
-    /** 3×3 row-major: white-balanced camera RGB → linear S-Gamut3 (D65). */
+    /** 3×3 row-major: white-balanced camera RGB → linear S-Gamut3.Cine (D65). */
     internal fun colorMatrix(c: JSONObject, ff: JSONObject): FloatArray {
         val bradford = floatArrayOf( // D50 → D65
             0.9555766f, -0.0230393f, 0.0631636f,
             -0.0282895f, 1.0099416f, 0.0210077f,
             0.0122982f, -0.0204830f, 1.3299098f)
-        val xyzToSg3 = inv(OpenDrt.M.SGAMUT3_TO_XYZ)
+        val xyzToSg3 = inv(OpenDrt.M.SGAMUT3CINE_TO_XYZ)
         val fm = arr(c, "forwardMatrix1")
         if (fm != null && fm.size == 9 && fm.any { it != 0f }) return mul(xyzToSg3, mul(bradford, fm))
         // no forward matrix: XYZ(D65) = inverse(ColorMatrix1) · neutral, scaled so the neutral maps to Y = 1

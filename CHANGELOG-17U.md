@@ -59,6 +59,9 @@ Import and timeline
   black level, MotionCam's lens shading map, as-shot white balance, demosaic, the camera's colour matrix, S-Gamut3 and
   S-Log3, the sensor's clip at EI 800 – into a 10-bit HEVC clip in Movies/Klipp Lab (BT.2020, SDR transfer tag,
   limited range, so Klipp edits it as log), with the file's sound as AAC, timed.
+- Import a MotionCam .mcraw: Import → Files app now lists .mcraw files too; a picked one is developed to S-Log3 /
+  S-Gamut3.Cine (as above, with a progress dialog) and the clip goes in with the rest – Klipp's default input, so no
+  setting to change.
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
   sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
   Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is
