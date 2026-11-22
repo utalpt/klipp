@@ -246,7 +246,7 @@ fun KlippTheme(content: @Composable () -> Unit) {
             error = K.Error,
         ),
     ) {
-        // Klipp 17U: the interface size (Settings → Appearance) – every dp and sp scaled by one factor
+        // Klipp Lab: the interface size (Settings → Appearance) – every dp and sp scaled by one factor
         val d = LocalDensity.current
         androidx.compose.runtime.CompositionLocalProvider(
             LocalDensity provides androidx.compose.ui.unit.Density(d.density * Ui17u.scale, d.fontScale),

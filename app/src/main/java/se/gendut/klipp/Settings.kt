@@ -109,19 +109,19 @@ object AppPrefs {
     fun base(c: Context): Base = runCatching { Base.valueOf(p(c).getString("base", null) ?: "") }.getOrDefault(Base.DARK)
     fun setBase(c: Context, b: Base) { p(c).edit().putString("base", b.name).apply(); K.base = b }
 
-    /** Klipp 17U: the monitor's height per picture shape (key: width/height, 3 decimals); 0 = fit the shape. */
+    /** Klipp Lab: the monitor's height per picture shape (key: width/height, 3 decimals); 0 = fit the shape. */
     fun monitorHeightFor(c: Context, shape: String): Float = p(c).getFloat("monitorH17u_$shape", 0f)
     fun setMonitorHeightFor(c: Context, shape: String, dp: Float) { p(c).edit().putFloat("monitorH17u_$shape", dp).apply() }
 
-    /** Klipp 17U: the picture's share of the width in landscape (the rest is the timeline). */
+    /** Klipp Lab: the picture's share of the width in landscape (the rest is the timeline). */
     fun landscapeSplit(c: Context): Float = p(c).getFloat("landscapeSplit17u", 0.46f).coerceIn(0.3f, 0.75f)
     fun setLandscapeSplit(c: Context, f: Float) { p(c).edit().putFloat("landscapeSplit17u", f).apply() }
 
-    /** Klipp 17U: imported clips go straight to the end of the timeline (no source/Insert step). */
+    /** Klipp Lab: imported clips go straight to the end of the timeline (no source/Insert step). */
     fun addOnImport(c: Context): Boolean = p(c).getBoolean("addOnImport17u", true)
     fun setAddOnImport(c: Context, on: Boolean) { p(c).edit().putBoolean("addOnImport17u", on).apply() }
 
-    /** Klipp 17U: interface size (1 = Klipp's) and full screen (see [Ui17u]). */
+    /** Klipp Lab: interface size (1 = Klipp's) and full screen (see [Ui17u]). */
     fun uiScale(c: Context): Float = p(c).getFloat("uiScale17u", 0.9f).let { v -> Ui17u.SCALES.minBy { kotlin.math.abs(it - v) } }
     fun setUiScale(c: Context, f: Float) { p(c).edit().putFloat("uiScale17u", f).apply(); Ui17u.scale = f }
     fun immersive(c: Context): Boolean = p(c).getBoolean("immersive17u", true)
@@ -208,7 +208,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
             }
             AccentTones()
             DropField(stringResource(R.string.settings_background), Base.entries.map { Opt(it, it.label, it.hint, key = it.name) }, K.base, "base") { AppPrefs.setBase(ctx, it) }
-            // Klipp 17U: interface size and full screen
+            // Klipp Lab: interface size and full screen
             val sizeNames = listOf(stringResource(R.string.settings17u_size_normal), stringResource(R.string.settings17u_size_compact), stringResource(R.string.settings17u_size_small))
             DropField(stringResource(R.string.settings17u_size), Ui17u.SCALES.mapIndexed { i, f -> Opt(f, sizeNames[i], "${(f * 100).toInt()} %", key = "ui$i") },
                 Ui17u.scale, "set:uiScale") { AppPrefs.setUiScale(ctx, it) }

@@ -74,7 +74,7 @@ interface MediaLibrary {
     fun delete(items: List<Long>, bins: List<Long>)
     /** Finds the missing files in a folder (and its subfolders) by name and links them again. */
     fun relinkFromFolder(tree: Uri) {}
-    /** Klipp 17U: the clips at the end of the timeline, in this order. */
+    /** Klipp Lab: the clips at the end of the timeline, in this order. */
     fun appendToTimeline(items: List<Long>) {}
 
     /** All media in a folder and its subfolders. */
@@ -184,7 +184,7 @@ fun MediaSheet(
                         }, Modifier.testTag("mediaRename"))
                         SpringChip(stringResource(R.string.medialibrary_delete), false, { confirmDelete = true }, Modifier.testTag("mediaDelete"))
                     }
-                    // Klipp 17U: the selected clips onto the timeline, in the order they were selected (a Set keeps it)
+                    // Klipp Lab: the selected clips onto the timeline, in the order they were selected (a Set keeps it)
                     if (picked.isNotEmpty() && pickedBins.isEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
                         PillButton(stringResource(R.string.medialibrary17u_add, picked.size), {
                             haptics.confirm(); lib.appendToTimeline(picked.toList()); clearPick(); onClose()
@@ -409,7 +409,7 @@ private fun MediaCard(m: MediaInfo, uri: Uri?, used: Int, picked: Boolean, onCli
                 Modifier.align(Alignment.Center).size(30.dp).clip(RoundedCornerShape(15.dp)).background(K.Primary),
                 contentAlignment = Alignment.Center,
             ) {
-                // Klipp 17U: the place in the selection (the order "Add to the timeline" uses) instead of a tick
+                // Klipp Lab: the place in the selection (the order "Add to the timeline" uses) instead of a tick
                 if (order > 0) Text("$order", color = K.OnPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 else androidx.compose.material3.Icon(Ic.Check, null, tint = K.OnPrimary, modifier = Modifier.size(18.dp))
             }

@@ -52,7 +52,7 @@ import se.gendut.klipp.engine.LutStore
 typealias LutPreview = suspend (lut: String?) -> ImageBitmap?
 
 /**
- * Klipp 17U: the LUT library as a strip of cards – each shows the current frame with that LUT ([preview]; without it,
+ * Klipp Lab: the LUT library as a strip of cards – each shows the current frame with that LUT ([preview]; without it,
  * the name only), in one strip ordered by the folders of the zip they were imported from, each group's name above its
  * first card. Tap = use it; hold = select several, to delete them. [selected] = the LUT in use (null = none).
  */

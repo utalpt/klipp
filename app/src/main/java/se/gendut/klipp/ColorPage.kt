@@ -618,7 +618,7 @@ private fun NodeTools(
         scope.launch { gs.endLive() }
     }
     var wbPicking by remember { mutableStateOf(false) }
-    // Klipp 17U: previews for the LUT browser – the frame at the playhead (small), graded with each LUT in this node
+    // Klipp Lab: previews for the LUT browser – the frame at the playhead (small), graded with each LUT in this node
     val lutTick = remember(current) { derivedStateOf { (current.srcAt(state.playhead) * 2).roundToInt() } }.value
     val lutFrame by produceState<Bitmap?>(null, current.uri, lutTick, editor, state.playing) {
         if (editor != 3 || state.playing) return@produceState

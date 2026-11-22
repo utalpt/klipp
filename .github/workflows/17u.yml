@@ -1,4 +1,4 @@
-name: Klipp 17U
+name: Klipp Lab
 
 # The fork's build (utalpt/klipp), as in Rawr 17U:
 # - a push to xiaomi-17u builds the APK, runs the fork's tests and republishes the `debug` prerelease, so its link stays
@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   android:
-    name: Klipp 17U APK and tests
+    name: Klipp Lab APK and tests
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -83,7 +83,7 @@ jobs:
           if [ -z "$base" ] || [ -z "$n" ]; then echo "::error::version not found in app/build.gradle.kts"; exit 1; fi
           if [ "$n" -lt 1 ] || [ "$n" -gt 99 ]; then echo "::error::the fork's release number must be 1-99"; exit 1; fi
           echo "version=$base-17u.$n" >> "$GITHUB_OUTPUT"
-          echo "Klipp 17U $base-17u.$n"
+          echo "Klipp Lab $base-17u.$n"
           if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$base-17u.$n" ]]; then
             echo "::error::tag $GITHUB_REF_NAME doesn't match the build's version v$base-17u.$n"; exit 1
           fi
@@ -108,7 +108,7 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"; } > "$RUNNER_TEMP/keystore.properties"
           echo "KLIPP_KEYSTORE=$RUNNER_TEMP/keystore.properties" >> "$GITHUB_ENV"
       # the APK first (it is uploaded even if a test fails)
-      - name: Klipp 17U build
+      - name: Klipp Lab build
         env:
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
@@ -144,7 +144,7 @@ jobs:
           gh release delete debug --cleanup-tag --yes || true
           gh release create debug klipp17u-debug.apk --prerelease --target "$GITHUB_SHA" \
             --title "Debug build" \
-            --notes "CI build of ${GITHUB_SHA::8} (${{ steps.ver.outputs.version }}), not a release. Installs beside Klipp as Klipp 17U."
+            --notes "CI build of ${GITHUB_SHA::8} (${{ steps.ver.outputs.version }}), not a release. Installs beside Klipp as Klipp Lab."
       # a tag: the release, with the annotated tag's message (else the version's CHANGELOG-17U.md section) and the footer
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
@@ -161,4 +161,4 @@ jobs:
             fi
             cat .github/release-footer.md
           } > "$RUNNER_TEMP/notes.md"
-          gh release create "$GITHUB_REF_NAME" out/*.apk --latest --title "Klipp 17U $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" out/*.apk --latest --title "Klipp Lab $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

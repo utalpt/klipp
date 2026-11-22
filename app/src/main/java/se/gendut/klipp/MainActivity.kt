@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
         AppLife.starts++
     }
 
-    // Klipp 17U: full screen again when the app comes back (the system shows the bars for dialogs and other apps)
+    // Klipp Lab: full screen again when the app comes back (the system shows the bars for dialogs and other apps)
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) Ui17u.applyBars(this)

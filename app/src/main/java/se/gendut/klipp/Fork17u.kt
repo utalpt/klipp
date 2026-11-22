@@ -18,7 +18,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 /**
- * Klipp 17U: interface size and full screen (settings → Appearance).
+ * Klipp Lab: interface size and full screen (settings → Appearance).
  * - [scale] shrinks the whole interface (dp and text) by one factor, set in [KlippTheme]: 1 = Klipp's size.
  * - [immersive] hides the status and navigation bars in the whole app; a swipe from the edge shows them for a moment.
  */
@@ -39,7 +39,7 @@ object Ui17u {
 }
 
 /**
- * Klipp 17U: the screen's safe area. In full screen the top keeps clear of the camera hole only (its own outline,
+ * Klipp Lab: the screen's safe area. In full screen the top keeps clear of the camera hole only (its own outline,
  * from the display cutout's bounding rects), not of the whole band the status bar used: on a punch-hole phone that
  * band is mostly empty and the top bar moves up into it. Otherwise (bars shown, or no outline known) the usual
  * safeDrawing padding.

@@ -566,7 +566,7 @@ fun PlaybackSync(controller: ProjectController, playback: ProgramPlayback, state
 
 // ------------------------------------------------------------------ media panel
 
-// Klipp 17U: the files app (Storage Access Framework) instead of the photo picker – the photo picker hides the files'
+// Klipp Lab: the files app (Storage Access Framework) instead of the photo picker – the photo picker hides the files'
 // names (a clip came in as "1000012345.mp4"); here a clip keeps its name (VID_20261121_165645.mp4) and can be picked
 // from any folder. The read permission is kept across restarts as before (takePersistableUriPermission in import).
 // It opens in the camera's folder (DCIM/Camera), not wherever the files app was last (e.g. the LUTs' folder).

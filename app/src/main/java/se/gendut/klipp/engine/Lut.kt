@@ -323,14 +323,14 @@ object LutStore {
         names += BLEACH
         val d = dir ?: return
         d.listFiles { f -> f.isFile && f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }?.forEach { names += it.nameWithoutExtension }
-        // Klipp 17U: a folder is a group (from a zip's folders); its LUTs are named "Group/Name"
+        // Klipp Lab: a folder is a group (from a zip's folders); its LUTs are named "Group/Name"
         d.listFiles { f -> f.isDirectory }?.sortedBy { it.name.lowercase() }?.forEach { g ->
             g.listFiles { f -> f.isFile && f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }
                 ?.forEach { names += g.name + "/" + it.nameWithoutExtension }
         }
     }
 
-    // ------------------------------------------------------------------ Klipp 17U: groups, zip import, delete
+    // ------------------------------------------------------------------ Klipp Lab: groups, zip import, delete
 
     /** The built-in LUTs (not files: they can't be deleted). */
     fun isBuiltIn(name: String) = name == TEAL_ORANGE || name == BLEACH

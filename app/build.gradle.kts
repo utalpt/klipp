@@ -110,7 +110,7 @@ android {
             matchingFallbacks += "release"
         }
     }
-    // Klipp 17U (fork utalpt/klipp, branch xiaomi-17u): its own app id and name, installed beside Klipp. The version is
+    // Klipp Lab (fork utalpt/klipp, branch xiaomi-17u): its own app id and name, installed beside Klipp. The version is
     // Klipp's plus the fork's release number N: versionName <Klipp's>-17u.N, versionCode <Klipp's> * 100 + N (as in Rawr
     // 17U). Kept in this one block so Klipp's own lines merge unchanged.
     val klipp17u = 1
@@ -118,7 +118,7 @@ android {
         applicationId = "x17u.klipp.editor"
         versionCode = versionCode!! * 100 + klipp17u
         versionNameSuffix = "-17u.$klipp17u"
-        manifestPlaceholders["appLabel"] = "Klipp 17U"
+        manifestPlaceholders["appLabel"] = "Klipp Lab"
     }
     packaging {
         // cargo ndk also copies DeepFilterNet's own cdylib (libdf-<hash>.so) into jniLibs; its code is linked into

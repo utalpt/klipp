@@ -1,6 +1,6 @@
-# Klipp 17U - changelog
+# Klipp Lab - changelog
 
-Klipp 17U is a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only), kept on the
+Klipp Lab is a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only), kept on the
 `xiaomi-17u` branch of [utalpt/klipp](https://github.com/utalpt/klipp). Each version is Klipp's version plus the
 fork's release number (`0.21.0-beta.1-17u.1` = Klipp 0.21.0-beta.1, fork release 1). Everything in Klipp's own
 changelog for that version applies too; this file lists only what the fork adds or changes.
@@ -22,7 +22,8 @@ Fixes
   (Y = 1.16 x source - 74 in 10 bit) in playback and export.
 
 App
-- Own app id (x17u.klipp.editor) and name (Klipp 17U): installs beside Klipp. The two apps don't share projects.
+- Own app id (x17u.klipp.editor) and name (Klipp Lab, formerly Klipp 17U: the same app id, so it installs over it and
+  keeps its projects): installs beside Klipp. The two apps don't share projects.
   Version code: Klipp's x 100 + the fork's release number.
 
 Credits

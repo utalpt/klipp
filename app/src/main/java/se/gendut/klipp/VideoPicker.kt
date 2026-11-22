@@ -54,7 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Klipp 17U: the phone's videos with previews, for the import. The system's own pickers show no thumbnail for 10-bit
+ * Klipp Lab: the phone's videos with previews, for the import. The system's own pickers show no thumbnail for 10-bit
  * log video (they can't make one) and, in the files app, list leftover ".pending" files first; this one draws the
  * previews with Klipp's own decoder (as the media panel does), newest first, by folder, with the file names. Picked
  * clips come back in the order they were picked. "Files app" opens the system picker for anything else.

@@ -270,14 +270,14 @@ private fun KlippAppContent(
     }
     // release the source decoder only when the source is actually closed (not when the phone rotates)
     LaunchedEffect(sourceMedia) { if (sourceMedia == null) sourcePlayback?.close() }
-    // Klipp 17U: with "add to the timeline on import" the clips are on the timeline already – the media panel stays shut
+    // Klipp Lab: with "add to the timeline on import" the clips are on the timeline already – the media panel stays shut
     val picker = rememberVideoPicker { uris -> controller?.import(uris); if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true }
-    // Klipp 17U: Klipp's own video picker (previews of log video, newest first); its "Files app" opens the system one
+    // Klipp Lab: Klipp's own video picker (previews of log video, newest first); its "Files app" opens the system one
     var videoPicker by remember { mutableStateOf(false) }
     fun openImport() { videoPicker = true }
     // an imported LUT goes into the timeline look, or into a node if the import was started from there
     var lutTarget by remember { mutableStateOf<((String) -> Unit)?>(null) }
-    // Klipp 17U: several .cube files and .zip packs at once (a zip's folders become groups)
+    // Klipp Lab: several .cube files and .zip packs at once (a zip's folders become groups)
     val lutPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         val target = lutTarget
         lutTarget = null
@@ -882,7 +882,7 @@ private fun KlippAppContent(
     ) {
         val landscape = maxWidth > maxHeight
         // the program monitor's height in portrait (drag the handle under the transport; double tap = the project's shape again)
-        // Klipp 17U: by default the picture's own shape (16:9, 4:3, 9:16…) so no grey bands are left around it, and a
+        // Klipp Lab: by default the picture's own shape (16:9, 4:3, 9:16…) so no grey bands are left around it, and a
         // height set by hand is kept per shape – one height for every project left a 16:9 picture in a square box after
         // a portrait project
         // (derived: an edit changes the snapshot, the shape seldom – the editor doesn't recompose on every edit for it)
@@ -1042,7 +1042,7 @@ private fun KlippAppContent(
         } else {
         if (landscape) {
             // landscape: picture (and source) on the left, the modes with the timeline on the right
-            // Klipp 17U: the split between the two sides can be dragged (the grip between them; double tap = back)
+            // Klipp Lab: the split between the two sides can be dragged (the grip between them; double tap = back)
             var split by remember { androidx.compose.runtime.mutableFloatStateOf(AppPrefs.landscapeSplit(context)) }
             val rowPx = with(density) { maxWidth.toPx() }
             Row(Modifier.fillMaxSize().safeArea17u()) {
@@ -1352,7 +1352,7 @@ internal fun LabelPicker(current: ClipLabel?, onPick: (ClipLabel?) -> Unit) {
     }
 }
 
-/** Klipp 17U: the grip between the picture and the timeline in landscape: drag sideways; double tap = back to the default. */
+/** Klipp Lab: the grip between the picture and the timeline in landscape: drag sideways; double tap = back to the default. */
 @Composable
 private fun SplitHandle(onDrag: (Float) -> Unit, onEnd: () -> Unit, onReset: () -> Unit) {
     Box(
@@ -1502,7 +1502,7 @@ private fun FullViewer(
         val wasLandscape = view.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         fullscreenOrientation(aspect)?.let { activity?.requestedOrientation = it }
         onDispose {
-            // Klipp 17U: back to the app's own setting (full screen keeps the bars hidden)
+            // Klipp Lab: back to the app's own setting (full screen keeps the bars hidden)
             if (se.gendut.klipp.Ui17u.immersive) Ui17u.applyBars(activity) else ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             if (activity != null && before != null && activity.requestedOrientation != before) {
                 // back the way the editor was: the sensor alone wouldn't turn a phone lying flat back. A moment later the

@@ -135,7 +135,7 @@ private fun Workspaces(pageOf: () -> Float, modifier: Modifier, onPick: (Int) ->
     BoxWithConstraints(modifier.fillMaxHeight()) {
         val itemPx = constraints.maxWidth / MODES.size.toFloat()
         val compact = maxWidth < 280.dp
-        // Klipp 17U: every workspace shows its name (not only the current one); where the row is narrow, names only
+        // Klipp Lab: every workspace shows its name (not only the current one); where the row is narrow, names only
         val namesOnly = maxWidth < 300.dp
         val dragging = Modifier.pointerInput(itemPx) {
             awaitEachGesture {

@@ -104,7 +104,7 @@ fun NodeLutEditor(n: GradeNode, onLive: (GradeNode) -> Unit, onCommit: (GradeNod
             stringResource(R.string.colortools_lut_intro),
             color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
         )
-        // Klipp 17U: the LUTs as a strip of preview cards in groups, several imported or deleted at once (LutBrowser)
+        // Klipp Lab: the LUTs as a strip of preview cards in groups, several imported or deleted at once (LutBrowser)
         LutBrowser(
             selected = n.lut,
             onPick = { name -> onCommit(if (name == null) n.copy(lut = null) else n.copy(lut = name, lutMix = if (n.lut == null) 1f else n.lutMix)) },

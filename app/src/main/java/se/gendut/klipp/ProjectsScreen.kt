@@ -210,7 +210,7 @@ fun ProjectsScreen(backend: ProjectsBackend, onSettings: (() -> Unit)? = null, o
     var renaming by remember { mutableStateOf<ProjectCard?>(null) }
     var deleting by remember { mutableStateOf<ProjectCard?>(null) }
     var versionsOf by remember { mutableStateOf<ProjectCard?>(null) }
-    // Klipp 17U: several projects selected, to delete them at once (the open one can't be: it is left out)
+    // Klipp Lab: several projects selected, to delete them at once (the open one can't be: it is left out)
     var selecting by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf(emptySet<String>()) }
     var deletingMany by remember { mutableStateOf(false) }
@@ -355,7 +355,7 @@ fun ProjectsScreen(backend: ProjectsBackend, onSettings: (() -> Unit)? = null, o
                     MenuRow(stringResource(R.string.projectsscreen_versions)) { menuFor = null; versionsOf = p }
                     if (folder != null) MenuRow(stringResource(R.string.projectsscreen_backup_change)) { menuFor = null; pendingBackup = null; pickFolder.launch(null) }
                     if (!p.current) MenuRow(stringResource(R.string.projectsscreen_delete), danger = true) { menuFor = null; deleting = p }
-                    // Klipp 17U: start selecting with this project, to delete several
+                    // Klipp Lab: start selecting with this project, to delete several
                     if (!p.current) MenuRow(stringResource(R.string.projects17u_select_several)) { menuFor = null; selecting = true; picked = setOf(p.id) }
                     Text(stringResource(R.string.projectsscreen_safety_note), color = K.OnSurfaceVar, fontSize = 12.sp, lineHeight = 16.sp,
                         modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 10.dp).testTag("safetyNote"))
@@ -622,7 +622,7 @@ private fun ProjectTile(p: ProjectCard, onOpen: () -> Unit, onMenu: () -> Unit, 
     Column(Modifier.padding(bottom = 10.dp)) {
         val pic = Modifier.fillMaxWidth().aspectRatio(1.83f).then(if (picked == true) Modifier.border(3.dp, K.Primary, RoundedCornerShape(16.dp)) else Modifier)
         ProjectPicture(p, 16, pic, onOpen, onMenu) {
-            // Klipp 17U: selected for deleting
+            // Klipp Lab: selected for deleting
             if (picked == true) Box(
                 Modifier.align(Alignment.Center).size(32.dp).clip(CircleShape).background(K.Primary),
                 contentAlignment = Alignment.Center,

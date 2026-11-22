@@ -172,7 +172,7 @@ class ProjectController(
 
     // ------------------------------------------------------------------ import
 
-    /** @param keepOrder Klipp 17U: added to the timeline in [picked]'s order (Klipp's video picker), not by name */
+    /** @param keepOrder Klipp Lab: added to the timeline in [picked]'s order (Klipp's video picker), not by name */
     fun import(picked: List<Uri>, keepOrder: Boolean = false) = scope.launch {
         if (picked.isEmpty()) return@launch
         busy = true
@@ -220,7 +220,7 @@ class ProjectController(
                         }
                         engine.exec("file.newSequence", p)
                     }
-                    // Klipp 17U: the imported clips go straight to the end of the timeline, in name order (the camera's
+                    // Klipp Lab: the imported clips go straight to the end of the timeline, in name order (the camera's
                     // names carry the date and time, so this is the order they were shot in) – no source/Insert step
                     if (se.gendut.klipp.AppPrefs.addOnImport(context)) {
                         val names = snap.media.associate { it.id to it.name }
@@ -365,7 +365,7 @@ class ProjectController(
         return n
     }
 
-    /** Klipp 17U: the media panel's "Add to timeline" – the selected clips at the end, in the order they were selected. */
+    /** Klipp Lab: the media panel's "Add to timeline" – the selected clips at the end, in the order they were selected. */
     fun appendToTimeline(items: List<Long>) = scope.launch { editLock.withLock {
         var n = 0
         try {

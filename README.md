@@ -1,8 +1,9 @@
 # 🎬 Klipp
 
-> **This is Klipp 17U**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only) on the
-> `xiaomi-17u` branch, with features we need for Xiaomi Ultra log footage: HLG export through the grade's OpenDRT, and
-> correct levels for full-range video files without a transfer tag. It installs beside Klipp as **Klipp 17U**
+> **This is Klipp Lab** (formerly Klipp 17U), a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren
+> (GPL-3.0-only) on the `xiaomi-17u` branch, where features are tried before they're offered to Klipp: HLG export
+> through the grade's OpenDRT, correct levels for video files without a transfer tag, a LUT browser, a video picker
+> with previews of log footage and more. It's built and tested on a Xiaomi 17 Ultra but isn't specific to it. It installs beside Klipp as **Klipp Lab**
 > (`x17u.klipp.editor`). What the fork changes: [CHANGELOG-17U.md](CHANGELOG-17U.md). APKs: the
 > [Releases](https://github.com/utalpt/klipp/releases) page; the latest CI build of `xiaomi-17u` is always at
 > https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk (not a release). Issues with the fork's own features go here, not to Klipp.
