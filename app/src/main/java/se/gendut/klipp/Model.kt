@@ -938,6 +938,42 @@ class EditorState(initial: List<Clip> = initialClips()) {
         return result
     }
 
+    /**
+     * Klipp Lab: close the gaps between the clips of [track]: each clip moves back to the end of the one before, the
+     * linked partners (picture and sound) with it. The space before the first clip stays. One undo. Returns how many
+     * gaps were closed (0: none, or something on a partner's track is in the way – a notice says which).
+     */
+    fun closeGaps(track: Int): Int {
+        if (locked(track)) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return 0 }
+        val live = clips.filter { it.id !in removing }
+        val own = live.filter { it.track == track }.sortedBy { it.start }
+        val shift = HashMap<Long, Float>()
+        var gaps = 0
+        var total = 0f
+        var prevEnd = own.firstOrNull()?.end ?: 0f
+        for (c in own.drop(1)) {
+            val g = c.start - prevEnd
+            if (g > 0.001f) { total += g; gaps++ }
+            prevEnd = maxOf(prevEnd, c.end)
+            if (total > 0f) shift[c.id] = total
+        }
+        if (gaps == 0) { onNotice?.invoke(Str.t(R.string.model17u_no_gaps)); return 0 }
+        for (c in own) shift[c.id]?.let { s -> for (p in partnersOf(c)) if (p.id !in shift) shift[p.id] = s }
+        val moving = live.filter { it.id in shift }
+        if (moving.any { locked(it.track) }) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return 0 }
+        // a partner on another track may only move into free space there
+        val blocked = moving.any { m ->
+            val s = m.start - shift.getValue(m.id)
+            live.any { o -> o.track == m.track && o.id !in shift && o.start < s + m.length - 0.001f && o.end > s + 0.001f }
+        }
+        if (blocked) { onNotice?.invoke(Str.t(R.string.model17u_gap_blocked)); return 0 }
+        // earliest first: each clip lands where the one before has already left
+        val moves = moving.sortedBy { it.start }.map { Triple(it, it.start - shift.getValue(it.id), it.track) }
+        backend?.let { it.moveMany(moves, false); return gaps }
+        commit(clips.map { c -> shift[c.id]?.let { c.copy(start = c.start - it) } ?: c })
+        return gaps
+    }
+
     /** Move a clip. With engine: overwrite (Select) or insert (Ripple). */
     fun moveClip(orig: Clip, start: Float, track: Int, insert: Boolean) {
         if (locked(orig.track) || locked(track)) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return }

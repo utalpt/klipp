@@ -51,6 +51,9 @@ Color and export
   encoding itself is Media3's.
 
 Import and timeline
+- Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
+  sound or picture with it; the space before the first clip stays), one undo. A selected clip also has Close gap next
+  to Delete (deletes it and closes the gap), as several selected clips already had.
 - Klipp Lab's own video picker: the phone's videos newest first, by folder, with previews of 10-bit log video (the
   system pickers show none), real file names, duration, resolution and date; hidden and ".pending" files left out.
   Picked in order, numbered. "Files app" opens the system picker for anything else. Asks for the videos read

@@ -517,7 +517,7 @@ fun Timeline(state: EditorState, tool: Tool, modifier: Modifier = Modifier) {
                         .padding(start = 8.dp, end = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TrackMenu(menu, { menu = false }, t, ts) { flag, on -> haptics.tick(); state.setTrackFlag(i, flag, on) }
+                    TrackMenu(menu, { menu = false }, t, ts, onCloseGaps = { menu = false; haptics.tick(); state.closeGaps(i) }) { flag, on -> haptics.tick(); state.setTrackFlag(i, flag, on) }
                     // an empty track as a slim lane: just its name (tap = target it, which opens it)
                     if (slim) { Text(t.name, color = K.Outline, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(start = 14.dp)); return@Row }
                     Box(
@@ -2277,7 +2277,7 @@ private fun HeaderToggleBox(icon: androidx.compose.ui.graphics.vector.ImageVecto
 
 /** Track states (hold the track header). Video tracks: lock, show/hide, sync lock. Audio tracks: lock, mute, solo, sync lock. */
 @Composable
-private fun TrackMenu(open: Boolean, onDismiss: () -> Unit, t: TrackDef, ts: TrackState, set: (String, Boolean) -> Unit) {
+private fun TrackMenu(open: Boolean, onDismiss: () -> Unit, t: TrackDef, ts: TrackState, onCloseGaps: () -> Unit = {}, set: (String, Boolean) -> Unit) {
     androidx.compose.material3.DropdownMenu(open, onDismiss, containerColor = K.SurfaceHighest, modifier = Modifier.testTag("trackMenu:${t.name}")) {
         @Composable
         fun item(label: String, on: Boolean, tag: String, click: () -> Unit) = androidx.compose.material3.DropdownMenuItem(
@@ -2295,6 +2295,12 @@ private fun TrackMenu(open: Boolean, onDismiss: () -> Unit, t: TrackDef, ts: Tra
         }
         item(stringResource(R.string.timeline_sync_lock), ts.syncLock
 , "syncLock") { set("syncLock", !ts.syncLock) }
+        // Klipp Lab: every clip of the track moves back to the end of the one before
+        androidx.compose.material3.DropdownMenuItem(
+            text = { Text(stringResource(R.string.timeline17u_close_gaps), color = K.OnSurface, fontSize = 14.sp) },
+            onClick = onCloseGaps,
+            modifier = Modifier.testTag("trackGaps:${t.name}"),
+        )
     }
 }
 
