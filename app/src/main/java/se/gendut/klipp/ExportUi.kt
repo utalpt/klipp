@@ -180,7 +180,10 @@ fun ExportOptions(
         2 -> {
     Chips {
         Choice("SDR · Rec.709", !s.hdr && !s.hlg, true, "exp:sdr") { onChange(s.copy(hdr = false, hlg = false)) }
-        Choice(stringResource(R.string.exportui_hdr_keep), s.hdr, hdrPossible && hdrBlocked == null, "exp:hdr") { onChange(s.copy(hdr = true, hlg = false, codec = MimeTypes.VIDEO_H265)) }
+        Choice(stringResource(R.string.exportui_hdr_keep), s.hdr && !s.dolby, hdrPossible && hdrBlocked == null, "exp:hdr") { onChange(s.copy(hdr = true, hlg = false, dolby = false, codec = MimeTypes.VIDEO_H265)) }
+        // Klipp Lab: the clips' HDR (a Dolby Vision clip's HLG base) as Dolby Vision, new metadata from the edit
+        if (se.gendut.klipp.engine.EncoderCaps.dolbyVisionSupported)
+            Choice("Dolby Vision · keep HDR", s.hdr && s.dolby, hdrPossible && hdrBlocked == null, "exp:dvKeep") { onChange(s.copy(hdr = true, hlg = false, dolby = true, codec = MimeTypes.VIDEO_H265)) }
         Choice("HLG · OpenDRT", s.hlg && !s.dolby, hlgReady && se.gendut.klipp.engine.EncoderCaps.hdrSupported, "exp:hlg") { onChange(s.copy(hdr = false, hlg = true, dolby = false, codec = MimeTypes.VIDEO_H265)) }
         // Klipp Lab: the same HLG as Dolby Vision 8.4, on phones with a Dolby Vision encoder
         if (se.gendut.klipp.engine.EncoderCaps.dolbyVisionSupported)
@@ -189,6 +192,7 @@ fun ExportOptions(
     Note(when {
         s.hlg && s.dolby -> "Dolby Vision 8.4: the HLG (Rec.2100, 1000 nits) of each clip's last OpenDRT node, encoded by the phone's Dolby Vision encoder, which makes the dynamic metadata from the exported frames. Plays as HLG where there is no Dolby Vision. The preview stays SDR."
         s.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; 10-bit HEVC. The preview stays SDR."
+        s.hdr && s.dolby -> "Dolby Vision from the clips' own HDR (a Dolby Vision clip's HLG base, cut and edited without a grade), encoded by the phone's Dolby Vision encoder, which makes new dynamic metadata from the exported frames."
         s.hdr -> stringResource(R.string.exportui_note_hdr)
         hdrBlocked != null -> hdrBlocked
         !hdrPossible -> stringResource(R.string.exportui_note_hdr_impossible)

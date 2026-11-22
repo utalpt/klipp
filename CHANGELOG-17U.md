@@ -22,6 +22,8 @@ Color and export
 - A new project's frame rate from a phone clip snaps to the nearest standard rate within 4 % (60, 120 and the other
   usual rates): a 60 fps clip whose variable rate averaged 58.6 made a 58.598 fps project, which dropped frames on export.
   The NTSC rates (59.94 …) only when the file really is on one.
+- Export → Dolby Vision · keep HDR: Dolby Vision clips (their HLG base) cut and edited without a grade come out as
+  Dolby Vision again, with new dynamic metadata made by the phone's encoder from the exported frames.
 - EI per clip (Color → the "EI" chip before the nodes, or the grid → Clip grade): the clip's log curve, the EI it was
   shot at and the EI it is rated at. Applied before all the clip's nodes: the log is decoded, the light scaled by
   rated / shot (as rating a cinema camera's log footage) and encoded again, so every node, LUT and OpenDRT gets the

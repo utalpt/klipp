@@ -146,7 +146,11 @@ data class ExportPlan(
                 }
             }
             if (hdr) {
-                val st = s.copy(hlg = false, codec = MimeTypes.VIDEO_H265)
+                // Klipp Lab: Dolby Vision from the clips' own HDR (a Dolby Vision 8.4 clip's HLG base, edited) – the
+                // encoder makes new dynamic metadata from the exported frames
+                val dv = s.dolby && caps.dolbyVision == Support.YES
+                if (s.dolby && !dv) warnings += Issue(Kind.DV_NONE)
+                val st = s.copy(hlg = false, dolby = dv, codec = if (dv) MimeTypes.VIDEO_DOLBY_VISION else MimeTypes.VIDEO_H265)
                 if (caps.size(st.codec, w, h) == Support.NO) errors += Issue(Kind.SIZE_NONE, st.codec)
                 return ExportPlan(st, w, h, fps, tenBit = false, hdr = true, errors, warnings)
             }
