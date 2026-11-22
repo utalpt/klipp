@@ -1,15 +1,45 @@
 # 🎬 Klipp
 
-> **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren
-> (GPL-3.0-only) on the `xiaomi-17u` branch, where features are tried before they're offered to Klipp: HLG export
-> through the grade's OpenDRT, correct levels for video files without a transfer tag, a LUT browser, a video picker
-> with previews of log footage and more. Its priority is log video, above all from George's camera mods for the
-> Xiaomi Ultra phones (S-Log3, HLG out), with their Dolby Vision video next, while staying a general video editor; it's built and tested on a Xiaomi
-> 17 Ultra but isn't specific to it. It installs beside Klipp as **Klipp Lab**
-> (`x17u.klipp.editor`). What the fork changes: [CHANGELOG-17U.md](CHANGELOG-17U.md). APKs: the
-> [Releases](https://github.com/utalpt/klipp/releases) page; the latest CI build of `xiaomi-17u` is always at
-> https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk (not a release). Issues with the fork's own features go here, not to Klipp.
-> Everything below is Klipp's own README.
+> 🧪 **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only)
+> on the `xiaomi-17u` branch. Its focus is log video, above all from George's camera mods for the Xiaomi Ultra
+> phones, and Dolby Vision, while staying a general video editor. Built and tested on a Xiaomi 17 Ultra, not specific
+> to it. It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
+> Klipp as pull requests; issues with the fork's own features go here, not to Klipp.
+
+## 🧪 What Klipp Lab adds
+
+- 🌈 **HLG export from the grade:** each clip's last OpenDRT node renders Rec.2100 HLG, 10-bit HEVC, tagged
+  BT.2020 / HLG (Google Photos shows it as HDR).
+- 🎥 **Dolby Vision export from the grade:** the same HLG encoded by the phone's Dolby Vision encoder as Profile 8.4
+  (HLG compatible), the dynamic metadata made from the edited frames.
+- 🔁 **Dolby Vision in, Dolby Vision out:** Dolby Vision clips cut and edited come out as Dolby Vision 8.4 again
+  (Export → Dolby Vision · keep HDR).
+- 📈 **Bitrates above the encoder's listed limit:** the phone lists 160 Mbps for Dolby Vision; Klipp Lab passes the
+  chosen bitrate on, up to 300 Mbps. Use CBR for Dolby Vision – in VBR the encoder keeps the bitrate low.
+- 🎚️ **EI per clip:** the EI a log clip was shot at and the EI it is rated at, applied before all nodes, LUTs and
+  OpenDRT, with where the sensor clips (the 0.0072 × EI relation from George Kiarie's RawViewer).
+- 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
+- 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
+- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
+- ➕ **Add to the timeline** in the order selected, or straight on import.
+- ⏱️ **Frame rates:** phone clips give a standard project rate (a 60 fps clip measured at 58.6 makes a 60 fps
+  project), and the rate chosen for a new project is kept.
+- 🎨 Files without a colour transfer keep their matrix and range.
+- ✅ Select several projects and delete them at once.
+- 📐 Resizable split in landscape, compact interface size; the selection box scrolls the timeline at the edges.
+
+Everything the fork changes, entry by entry: [CHANGELOG-17U.md](CHANGELOG-17U.md).
+
+**⬇️ Test build** (the latest CI build of `xiaomi-17u`, installs over the previous one):
+https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
+
+🙏 Credits: Klipp by Flabbjaxaren. OpenDRT by Jed Smith. EI relation and slow-mo idea from George Kiarie's RawViewer.
+Dolby Vision approach from Dolby's [dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor)
+sample (BSD-3-Clause-Clear).
+
+---
+
+*Everything below is Klipp's own README.*
 
 A multi-track video editor for Android phones, built for touch. A Kotlin/Jetpack Compose app on top of the
 [FilmCraft](https://github.com/storytold/filmcraft) editing engine (Rust, via JNI); playback and export with Media3.
