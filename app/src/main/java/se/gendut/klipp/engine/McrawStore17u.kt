@@ -13,6 +13,9 @@ import java.io.File
  */
 object McrawStore17u {
     fun dir(c: Context) = File(c.filesDir, "mcraw").apply { mkdirs() }
+
+    /** Bumped when develops are made or removed, so the storage figures in Settings follow. */
+    var revision by androidx.compose.runtime.mutableIntStateOf(0)
     private fun index(c: Context) = File(dir(c), "index.json")
 
     /** The develop of [src] (named [name]) at [ei]: the same source at the same settings is the same file. */
@@ -27,7 +30,7 @@ object McrawStore17u {
         val f = fileFor(c, src, name, ei)
         if (f.exists() && f.length() > 0) return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "")
         val r = McrawConvert.convert(c, src, outFile = f, ei = ei, progress = progress)
-        if (r.uri != null) record(c, f, src, name, ei)
+        if (r.uri != null) { record(c, f, src, name, ei); revision++ }
         return r
     }
 
@@ -36,6 +39,9 @@ object McrawStore17u {
         o.put(f.name, JSONObject().put("source", src.toString()).put("name", name).put("ei", ei).put("made", System.currentTimeMillis()))
         runCatching { index(c).writeText(o.toString()) }
     }
+
+    /** Deletes every develop (Settings → Clear). */
+    fun clearAll(c: Context) { dir(c).listFiles()?.forEach { it.delete() }; revision++ }
 
     fun bytes(c: Context): Long = dir(c).listFiles()?.filter { it.isFile && it.name.endsWith(".mp4") }?.sumOf { it.length() } ?: 0L
 
@@ -59,7 +65,7 @@ object McrawStore17u {
                 if (o.has(f.name)) { o.remove(f.name); changed = true }
             }
         }
-        if (changed) runCatching { index(c).writeText(o.toString()) }
+        if (changed) { runCatching { index(c).writeText(o.toString()) }; revision++ }
     }
 }
 

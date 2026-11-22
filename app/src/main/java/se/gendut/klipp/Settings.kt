@@ -436,23 +436,25 @@ private fun AccentTones() {
  */
 @Composable
 private fun StorageSummary(ctx: android.content.Context) {
-    data class Use(val proxies: Long, val cache: Long, val renders: Long, val other: Long, val free: Long)
+    data class Use(val proxies: Long, val cache: Long, val renders: Long, val other: Long, val free: Long, val mcraw: Long = 0L)
     var use by remember { mutableStateOf<Use?>(null) }
     androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.Proxies.revision, se.gendut.klipp.engine.NodeCache.revision,
-        se.gendut.klipp.engine.RenderCache.revision, se.gendut.klipp.engine.HoldVideos.revision) {
+        se.gendut.klipp.engine.RenderCache.revision, se.gendut.klipp.engine.HoldVideos.revision,
+        se.gendut.klipp.engine.McrawStore17u.revision) {
         use = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             fun dirSize(name: String) = java.io.File(ctx.filesDir, name).walkBottomUp().filter { it.isFile }.sumOf { it.length() }
             Use(
                 se.gendut.klipp.engine.Proxies.size(ctx), se.gendut.klipp.engine.NodeCache.size(ctx), se.gendut.klipp.engine.RenderCache.bytes(),
                 dirSize("holds") + dirSize("reversed"),
                 runCatching { android.os.StatFs(ctx.filesDir.path).availableBytes }.getOrDefault(0L),
+                se.gendut.klipp.engine.McrawStore17u.bytes(ctx), // Klipp Lab: the MCRAW develops count in the total
             )
         }
     }
     val u = use ?: return
     val gb = { b: Long -> b / 1e9 }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).testTag("set:storage")) {
-        Text(stringResource(R.string.settings_storage_summary, gb(u.proxies + u.cache + u.renders + u.other), gb(u.free)),
+        Text(stringResource(R.string.settings_storage_summary, gb(u.proxies + u.cache + u.renders + u.other + u.mcraw), gb(u.free)),
             color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.settings_storage_parts, gb(u.proxies), gb(u.cache), gb(u.renders), gb(u.other)),
             color = K.OnSurfaceVar, fontSize = 12.sp)

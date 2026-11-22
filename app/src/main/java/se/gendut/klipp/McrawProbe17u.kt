@@ -121,7 +121,7 @@ fun Storage17uRows(ctx: Context) {
     val scope = rememberCoroutineScope()
     var mcraw by remember { mutableStateOf(0L) }
     var rev by remember { mutableStateOf(0) }
-    androidx.compose.runtime.LaunchedEffect(rev) { mcraw = withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.bytes(ctx) } }
+    androidx.compose.runtime.LaunchedEffect(rev, se.gendut.klipp.engine.McrawStore17u.revision) { mcraw = withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.bytes(ctx) } }
     Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("MotionCam RAW develops", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -130,7 +130,7 @@ fun Storage17uRows(ctx: Context) {
         }
         FlatTextButton(onClick = {
             scope.launch {
-                withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.dir(ctx).listFiles()?.forEach { it.delete() } }
+                withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.clearAll(ctx) }
                 rev++
             }
         }, modifier = Modifier.testTag("set:clearMcraw")) { Text("Clear") }
