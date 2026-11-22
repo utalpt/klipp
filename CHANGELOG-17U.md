@@ -40,9 +40,6 @@ Layout
 Projects
 - Select several projects (✓ in the header, or "Select several" in a project's menu) and delete them at once.
 
-App
-- Renamed Klipp Lab (was Klipp 17U). Same app id: installs over it and keeps its projects.
-
 Offered to Klipp (pull requests)
 - #4 files without a transfer keep their matrix and range, #5 the LUT browser, #6 HLG from OpenDRT, #7 clips keep
   their names, #8 adding clips to the timeline (off by default there).
@@ -64,8 +61,7 @@ Fixes
   (Y = 1.16 x source - 74 in 10 bit) in playback and export.
 
 App
-- Own app id (x17u.klipp.editor) and name (Klipp Lab, formerly Klipp 17U: the same app id, so it installs over it and
-  keeps its projects): installs beside Klipp. The two apps don't share projects.
+- Own app id (x17u.klipp.editor) and name (Klipp Lab): installs beside Klipp. The two apps don't share projects.
   Version code: Klipp's x 100 + the fork's release number.
 
 Credits

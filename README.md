@@ -1,6 +1,6 @@
 # 🎬 Klipp
 
-> **This is Klipp Lab** (formerly Klipp 17U), a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren
+> **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren
 > (GPL-3.0-only) on the `xiaomi-17u` branch, where features are tried before they're offered to Klipp: HLG export
 > through the grade's OpenDRT, correct levels for video files without a transfer tag, a LUT browser, a video picker
 > with previews of log footage and more. Its priority is log video, above all from George's camera mods for the
