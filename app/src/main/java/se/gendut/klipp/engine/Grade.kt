@@ -333,6 +333,44 @@ class WindowTrack(
     }
 }
 
+/**
+ * Klipp Lab: how the clip was recorded – its log curve [input] (an [OpenDrt.Input] key), the EI it was shot at [shot]
+ * and the EI it is rated at [rated] (0 = not set). It applies to the clip before all its nodes: the log is decoded,
+ * the linear light scaled by [rated] / [shot] (as rating a cinema camera's log footage at another EI) and encoded
+ * again on the same curve, so every node, LUT and OpenDRT gets the rated footage. With George Kiarie's camera mods
+ * the sensor clips at 0.0072 × EI scene linear (their gamma tables are slog3(0.0072·EI·s), from his RawViewer):
+ * log2(EI / 25) stops over 18 % grey.
+ */
+data class InputEi(val input: String = OpenDrt.Input.SLOG3.key, val shot: Int = 0, val rated: Int = 0) {
+    val gain: Float get() = if (shot > 0 && rated > 0) rated.toFloat() / shot else 1f
+    val active: Boolean get() = kotlin.math.abs(gain - 1f) > 1e-4f
+
+    /** Stops of the sensor's clip over 18 % grey at the EI in use (rated, else shot); null = no EI set. */
+    val clipStops: Float? get() = (if (rated > 0 && shot > 0) rated else shot).takeIf { it > 0 }?.let { kotlin.math.log2(it / 25f) }
+
+    /** The per-channel table (as [GradeNode.Params.curves]): decode, scale, encode again. */
+    fun tables(): Array<FloatArray> {
+        val tf = OpenDrt.Input.of(input).oetf
+        val g = gain
+        val t = FloatArray(GradeNode.CURVE_N) { i -> OpenDrt.encode(OpenDrt.oetf(GradeNode.curveX(i), tf) * g, tf) }
+        return arrayOf(t, t.copyOf(), t.copyOf())
+    }
+
+    fun toJson(): JSONObject = JSONObject().put("in", input).put("shot", shot).put("rated", rated)
+
+    companion object {
+        /** EIs to pick from (one-third stops). */
+        val EIS = listOf(100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800)
+        /** The input node's id in [ClipGrade.chain] (nodes are numbered from 1). */
+        const val NODE_ID = -100
+
+        fun fromJson(o: JSONObject?): InputEi? = o?.let {
+            InputEi(OpenDrt.Input.of(it.optString("in", OpenDrt.Input.SLOG3.key)).key,
+                it.optInt("shot", 0).coerceIn(0, 102_400), it.optInt("rated", 0).coerceIn(0, 102_400))
+        }
+    }
+}
+
 data class GradeNode(
     val id: Int,
     val label: String = "",
@@ -387,6 +425,8 @@ data class GradeNode(
     val logHigh: Float = 0.55f,
     /** The film as it was when it was turned off – it comes back when turned on again (not drawn). */
     val filmOff: Film? = null,
+    /** Klipp Lab: only in the clip's input node ([ClipGrade.chain]): the EI rating, as the node's curves. */
+    val inputEi: InputEi? = null,
 ) {
     val hasLog get() = !(logShadow.isNeutral && logMid.isNeutral && logHi.isNeutral)
     val hasCurves get() = !(curveY.isIdentity && curveR.isIdentity && curveG.isIdentity && curveB.isIdentity)
@@ -396,7 +436,7 @@ data class GradeNode(
     val hasKey get() = qual.on || win.on
     val hasBlur get() = blur > 0.0001f || pixelate > 0.0001f || denoise > 0.0001f
     val isNeutral get() = !enabled || mix <= 0.0001f || (lift.isNeutral && gamma.isNeutral && gain.isNeutral && offset.isNeutral &&
-        contrast == 1f && sat == 1f && density == 0f && hue == 0f && temp == 0f && tint == 0f && !hasCurves && !hasLog && !hasHsl && !hasLut && !hasBlur && drt == null && film == null)
+        contrast == 1f && sat == 1f && density == 0f && hue == 0f && temp == 0f && tint == 0f && !hasCurves && !hasLog && !hasHsl && !hasLut && !hasBlur && drt == null && film == null && inputEi?.active != true)
 
     /** Uniform values (shared by the CPU path and the shader). */
     class Params(
@@ -460,7 +500,8 @@ data class GradeNode(
             k * (1 - c) + sq * s, c + k * (1 - c), k * (1 - c) - sq * s,
             k * (1 - c) - sq * s, k * (1 - c) + sq * s, c + k * (1 - c),
         )
-        val curves = if (hasCurves || hasLog) {
+        val eiTables = inputEi?.takeIf { it.active }?.tables()
+        val curves = if (eiTables != null) eiTables else if (hasCurves || hasLog) {
             val y = curveY.table(); val r = curveR.table(); val gg = curveG.table(); val b = curveB.table()
             val sh = logShadow.rgb(); val md = logMid.rgb(); val hi = logHi.rgb()
             fun amount(w: Wheel, c: FloatArray, i: Int) = c[i] * 0.25f + w.master * 0.5f
@@ -783,11 +824,16 @@ data class ClipGrade(
     val layer: LayerFx? = null,
     /** Motion blur from the camera's movement (after the stabilization; see [MotionBlur]). */
     val mblur: MotionBlur? = null,
+    /** Klipp Lab: how the clip was recorded (log curve, EI shot and rated) – applied before the nodes. */
+    val ei: InputEi? = null,
 ) {
+    /** The input node: the EI rating, first in [chain] (null when not rated). */
+    val eiNode: GradeNode? get() = ei?.takeIf { it.active }?.let { GradeNode(InputEi.NODE_ID, "EI", inputEi = it) }
+
     /** Needs the frames' source time (tracked windows, stabilization, motion blur, the mask's keyframes). */
     val needsClock get() = hasTrack || stab != null || mblur != null || layer?.mask?.animated == true || layer?.crop?.animated == true
     /** The whole chain that is computed (the nodes in order). */
-    val chain: List<GradeNode> get() = nodes
+    val chain: List<GradeNode> get() = listOfNotNull(eiNode) + nodes
     val isNeutral get() = chain.all { it.isNeutral } && stab == null && mblur == null
     val hasTrack get() = nodes.any { it.win.track != null }
 
@@ -803,13 +849,13 @@ data class ClipGrade(
      * their tracking, film) – back to one fresh primary node. What Edit › Picture owns stays as it is, keyframes and all:
      * the layer (keying, mask, blend, crop), the stabilization and the motion blur.
      */
-    fun colorReset(): ClipGrade = ClipGrade(stab = stab, layer = layer, mblur = mblur)
+    fun colorReset(): ClipGrade = ClipGrade(stab = stab, layer = layer, mblur = mblur, ei = ei)
 
     /** The grade at source time [src]: tracked windows moved there (stills, scopes, the CPU path). */
     fun at(src: Double?): ClipGrade = if (!hasTrack) this else copy(nodes = nodes.map { n -> if (n.win.track == null) n else n.copy(win = n.win.at(src)) })
 
     fun toJson(): JSONObject = JSONObject().put("nodes", JSONArray().also { a -> nodes.forEach { a.put(it.toJson()) } })
-        .apply { stab?.let { put("stab", it.toJson()) }; layer?.let { put("layer", it.toJson()) }; mblur?.let { put("mblur", it.toJson()) } }
+        .apply { stab?.let { put("stab", it.toJson()) }; layer?.let { put("layer", it.toJson()) }; mblur?.let { put("mblur", it.toJson()) }; ei?.let { put("ei", it.toJson()) } }
 
     /**
      * The whole chain on a bitmap (preview and scopes). With [keyOf] = a node id, that node's key is shown
@@ -887,7 +933,7 @@ data class ClipGrade(
 
     /** Playback effects when the image up to and including node [point] comes from the node cache: the remaining nodes and the stabilization. */
     fun effectsAfter(point: Int, clip: Long?, clock: ((Long) -> Double?)?, main: Boolean = false, filmRef: Int = 0): List<androidx.media3.common.Effect> =
-        copy(nodes = nodes.drop(point + 1).ifEmpty { listOf(GradeNode(Int.MIN_VALUE)) }).effects(clip, main, filmRef, clock = clock)
+        copy(ei = null, nodes = nodes.drop(point + 1).ifEmpty { listOf(GradeNode(Int.MIN_VALUE)) }).effects(clip, main, filmRef, clock = clock)
 
     /**
      * Can be exported in HLG: the last node that colors has OpenDRT over the whole image (no qualifier or window, full
@@ -905,9 +951,15 @@ data class ClipGrade(
             val stab = Stabilization.fromJson(o?.optJSONObject("stab"))
             val layer = LayerFx.fromJson(o?.optJSONObject("layer"))
             val mblur = MotionBlur.fromJson(o?.optJSONObject("mblur"))
-            val a = o?.optJSONArray("nodes") ?: return ClipGrade(stab = stab, layer = layer, mblur = mblur)
+            var ei = InputEi.fromJson(o?.optJSONObject("ei"))
+            val a = o?.optJSONArray("nodes") ?: return ClipGrade(stab = stab, layer = layer, mblur = mblur, ei = ei)
+            // (Klipp Lab test builds had the EI in the OpenDRT node: moved to the clip)
+            if (ei == null) for (i in 0 until a.length()) {
+                val d = a.optJSONObject(i)?.optJSONObject("drt") ?: continue
+                if (d.optInt("eiS", 0) > 0) { ei = InputEi(OpenDrt.Input.of(d.optString("in")).key, d.optInt("eiS"), d.optInt("ei", 0)); break }
+            }
             val n = (0 until a.length()).map { GradeNode.fromJson(a.getJSONObject(it)) }
-            return if (n.isEmpty()) ClipGrade(stab = stab, layer = layer, mblur = mblur) else ClipGrade(n, stab, layer, mblur)
+            return if (n.isEmpty()) ClipGrade(stab = stab, layer = layer, mblur = mblur, ei = ei) else ClipGrade(n, stab, layer, mblur, ei)
         }
     }
 }

@@ -366,6 +366,8 @@ fun ColorPage(
     var editor by gs::editor
     // the grid button: the gallery, the clip's grade and the timeline's look instead of the node's tools
     var more by gs::grid
+    // Klipp Lab: the grid panel's tab (the EI chip opens the clip grade tab)
+    var moreTab by rememberSaveable { mutableStateOf(0) }
     var nodeMenu by remember { mutableStateOf<GradeNode?>(null) }
     var stillMenu by remember { mutableStateOf<Still?>(null) }
     var renaming by remember { mutableStateOf<GradeNode?>(null) }
@@ -398,10 +400,12 @@ fun ColorPage(
                 nodeId = nid; more = false
             },
             onMore = { haptics.tick(); more = !more },
+            // Klipp Lab: the clip's input (EI) – in the clip grade tab
+            onInput = { haptics.tick(); moreTab = 1; more = true },
         )
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(K.Surface).padding(top = 10.dp)) {
             when {
-                more -> ColorMore(state, gs, clips, current, look, setNode = { nodeId = it }, onStillMenu = { haptics.heavy(); stillMenu = it }, onDone = { more = false }, timeline = timeline)
+                more -> ColorMore(state, gs, clips, current, look, moreTab, { moreTab = it }, setNode = { nodeId = it }, onStillMenu = { haptics.heavy(); stillMenu = it }, onDone = { more = false }, timeline = timeline)
                 current == null || node == null -> NoClip()
                 else -> NodeTools(state, gs, current, node, editor, { editor = it }, onImportLut, setNode = { nodeId = it })
             }
@@ -538,10 +542,27 @@ private fun ClipThumb(n: Int, c: ColorClip, selected: Boolean, graded: Boolean, 
 private fun NodeRow(
     clip: ColorClip?, g: ClipGrade?, selected: Int?, more: Boolean,
     onPick: (Int) -> Unit, onMenu: (GradeNode) -> Unit, onAdd: () -> Unit, onMore: () -> Unit,
+    onInput: () -> Unit = {},
 ) {
     Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).sideScroll(), verticalAlignment = Alignment.CenterVertically) {
             if (clip != null && g != null) {
+                // Klipp Lab: the clip's input before the nodes – "EI" or "EI 800→1600"
+                val ei = g.ei
+                val eiText = when {
+                    ei == null || ei.shot <= 0 -> "EI"
+                    ei.rated > 0 && ei.rated != ei.shot -> "EI ${ei.shot}→${ei.rated}"
+                    else -> "EI ${ei.shot}"
+                }
+                val eiSrc = remember { MutableInteractionSource() }
+                Box(
+                    Modifier.pressPop(eiSrc, 0.92f).height(44.dp).clip(RoundedCornerShape(14.dp))
+                        .background(if (ei?.active == true) K.PrimaryContainer.copy(alpha = 0.5f) else K.SurfaceHigh)
+                        .clickable(interactionSource = eiSrc, indication = null, role = Role.Button, onClick = onInput)
+                        .padding(horizontal = 12.dp).testTag("clipInput"),
+                    contentAlignment = Alignment.Center,
+                ) { Text(eiText, color = if ((ei?.shot ?: 0) > 0) K.OnSurface else K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+                Wire()
                 val cacheStatus = se.gendut.klipp.engine.NodeCache.status(clip.id)
                 for ((i, n) in g.nodes.withIndex()) key(n.id) {
                     if (i > 0) Wire()
@@ -763,6 +784,45 @@ private fun Flush(content: @Composable ColumnScope.() -> Unit) {
  * What the grid button opens instead of the node's tools: the gallery (stills to compare against and take grades
  * from), the grade actions for the clip, and the timeline's look.
  */
+/**
+ * Klipp Lab: how the clip was recorded – the log curve, the EI it was shot at and the EI it is rated at (see [InputEi]).
+ * Applied before the clip's nodes; "All clips" gives the same to every clip (a shoot usually has one EI).
+ */
+@Composable
+private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: ColorClip) {
+    val haptics = rememberHaptics()
+    val g = gs.of(current.id)
+    // (the curve: the clip's own, else the first OpenDRT node's, else S-Log3)
+    val ei = g.ei ?: se.gendut.klipp.engine.InputEi(g.nodes.firstNotNullOfOrNull { it.drt }?.input ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key)
+    fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = e.takeIf { it.shot > 0 }))
+    Text(stringResource(R.string.colorpage_input_title), color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp))
+    Text(stringResource(R.string.colorpage_input_intro), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+    val inputs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
+    Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
+        se.gendut.klipp.DropField(stringResource(R.string.colorpage_input_curve), inputs.map { se.gendut.klipp.Opt(it.key, it.label, key = it.key) }, ei.input, "clipInput:curve") { set(ei.copy(input = it)) }
+    }
+    val off = stringResource(R.string.colortools_ei_off)
+    val eis = listOf(se.gendut.klipp.Opt(0, off, key = "0")) + se.gendut.klipp.engine.InputEi.EIS.map { se.gendut.klipp.Opt(it, it.toString(), key = it.toString()) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f)) {
+            se.gendut.klipp.DropField(stringResource(R.string.colortools_ei_shot), eis, ei.shot, "clipInput:shot") { set(ei.copy(shot = it, rated = if (it == 0) 0 else ei.rated)) }
+        }
+        Box(Modifier.weight(1f)) {
+            se.gendut.klipp.DropField(stringResource(R.string.colortools_ei_rate), eis, ei.rated, "clipInput:rated") { set(ei.copy(rated = it)) }
+        }
+    }
+    ei.clipStops?.let { st ->
+        Text(
+            stringResource(R.string.colortools_ei_note, "%.1f".format(st)) + if (ei.active) " · " + "%+.2f EV".format(kotlin.math.log2(ei.gain)) else "",
+            color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+        )
+    }
+    if (g.ei != null && clips.size > 1) ToggleChip(stringResource(R.string.colorpage_input_all), false, {
+        haptics.confirm()
+        gs.setAll(clips.filter { it.id != current.id }.associate { it.id to gs.of(it.id).copy(ei = g.ei) })
+    }, Modifier.padding(start = 16.dp, top = 6.dp).testTag("clipInput:all"))
+}
+
 @Composable
 private fun ColorMore(
     state: EditorState,
@@ -770,6 +830,8 @@ private fun ColorMore(
     clips: List<ColorClip>,
     current: ColorClip?,
     look: se.gendut.klipp.engine.Look,
+    tab: Int,
+    setTab: (Int) -> Unit,
     setNode: (Int) -> Unit,
     onStillMenu: (Still) -> Unit,
     onDone: () -> Unit,
@@ -778,12 +840,11 @@ private fun ColorMore(
     val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
-    var tab by rememberSaveable { mutableStateOf(0) }
     val names = listOf(stringResource(R.string.colorpage_gallery), stringResource(R.string.colorpage_clip_grade), stringResource(R.string.colorpage_tab_timeline))
     val tags = listOf("lower:gallery", "lower:grade", "colorTab:timeline")
     Column(Modifier.fillMaxSize()) {
         SheetHeader(names[tab], onDone = onDone)
-        ConnectedToggleGroup(names, tab, { tab = it }, Modifier.padding(horizontal = 12.dp).fillMaxWidth(), height = 44.dp, tag = { tags[it] })
+        ConnectedToggleGroup(names, tab, { setTab(it) }, Modifier.padding(horizontal = 12.dp).fillMaxWidth(), height = 44.dp, tag = { tags[it] })
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).testTag("colorScroll").padding(top = 8.dp, bottom = LocalBarSpace.current + 26.dp)) {
             when (tab) {
                 0 -> if (current == null) NoClip() else {
@@ -797,7 +858,7 @@ private fun ColorMore(
                     }, onMenu = onStillMenu)
                     Text(stringResource(R.string.colorpage_gallery_hint), color = K.Outline, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 }
-                1 -> if (current == null) NoClip() else Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+                1 -> if (current == null) NoClip() else Column { Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     ActionTile(stringResource(R.string.colorpage_copy), Ic.Copy, Modifier.weight(1f).testTag("grade:copy")) {
                         haptics.confirm(); gs.copyGrade(current.id)
                     }
@@ -812,6 +873,8 @@ private fun ColorMore(
                     }
                     ActionTile(stringResource(R.string.colorpage_reset), Ic.Reset, Modifier.weight(1f).testTag("grade:reset"), danger = true) { haptics.heavy(); gs.set(current.id, gs.of(current.id).colorReset()); setNode(1) }
                     // (stabilization and motion blur are on the clip: Picture in the edit page)
+                }
+                    ClipInputEditor(gs, clips, current)
                 }
                 else -> {
                     // grade on the original files instead of the proxy (full resolution, no transcoding) – applies app-wide

@@ -119,7 +119,7 @@ object NodeCache {
     private fun compute(clip: ClipSnap, uri: Uri, mediaDur: Double?, g: ClipGrade): Req? {
         val point = g.cachePoint
         if (point < 0) return null
-        val nodes = g.nodes.take(point + 1)
+        val nodes = listOfNotNull(g.eiNode) + g.nodes.take(point + 1)
         if (nodes.all { it.isNeutral }) return null
         val a = (floor(clip.sourceIn) - HANDLE).coerceAtLeast(0.0)
         var b = ceil(clip.sourceIn + clip.duration * kotlin.math.abs(clip.speed)) + HANDLE
@@ -135,6 +135,7 @@ object NodeCache {
         sb.append(androidx.media3.effect.KlippPrecision.sdrYuv).append('|')
         for (n in nodes) {
             sb.append(n.copy(cache = false, label = "").toJson().toString()).append('|')
+            n.inputEi?.let { sb.append("ei").append(it.toJson()).append('|') }
             // the LUT's contents (a new LUT with the same name must produce a new cache)
             n.lut?.let { name -> runCatching { LutStore.get(name) }.getOrNull()?.data?.contentHashCode()?.let { sb.append("lut").append(it).append('|') } }
         }

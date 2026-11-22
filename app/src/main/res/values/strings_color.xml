@@ -15,6 +15,10 @@
     <string name="colortools_creative_white">Creative white point</string>
     <string name="colortools_white_limit">White point limit</string>
     <string name="colortools_mid_grey_nits">Mid grey (nits)</string>
+    <string name="colorpage_input_title">Input (EI)</string>
+    <string name="colorpage_input_intro">How the clip was recorded, applied before its nodes: rating at another EI scales the light as on a cinema camera, so every node, LUT and OpenDRT gets the rated footage.</string>
+    <string name="colorpage_input_curve">Log curve</string>
+    <string name="colorpage_input_all">Same EI for all clips</string>
     <string name="colortools_ei_shot">Shot at EI</string>
     <string name="colortools_ei_rate">Rated at EI</string>
     <string name="colortools_ei_off">Off</string>

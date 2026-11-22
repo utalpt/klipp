@@ -15,6 +15,10 @@
     <string name="colortools_creative_white">Kreativ vitpunkt</string>
     <string name="colortools_white_limit">Vitpunktens gräns</string>
     <string name="colortools_mid_grey_nits">Mellangrått (nits)</string>
+    <string name="colorpage_input_title">Indata (EI)</string>
+    <string name="colorpage_input_intro">Hur klippet spelades in, före dess noder: en annan EI skalar ljuset som på en filmkamera, så att alla noder, LUT:ar och OpenDRT får det bedömda materialet.</string>
+    <string name="colorpage_input_curve">Log-kurva</string>
+    <string name="colorpage_input_all">Samma EI för alla klipp</string>
     <string name="colortools_ei_shot">Inspelad med EI</string>
     <string name="colortools_ei_rate">Bedömd som EI</string>
     <string name="colortools_ei_off">Av</string>

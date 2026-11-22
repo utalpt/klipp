@@ -144,26 +144,6 @@ private fun DrtEditor(n: GradeNode, onCommit: (GradeNode) -> Unit) {
     androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (inp in se.gendut.klipp.engine.OpenDrt.Input.entries) ToggleChip(inp.label, d.input == inp.key, { set(d.copy(input = inp.key)) }, Modifier.testTag("drtIn:${inp.key}"))
     }
-    // Klipp Lab: the EI the clip was shot at and the EI it is rated at (log footage)
-    if (d.input != se.gendut.klipp.engine.OpenDrt.Input.REC709.key) {
-        val off = stringResource(R.string.colortools_ei_off)
-        val eis = listOf(se.gendut.klipp.Opt(0, off, key = "0")) + se.gendut.klipp.engine.OpenDrt.EIS.map { se.gendut.klipp.Opt(it, it.toString(), key = it.toString()) }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                se.gendut.klipp.DropField(stringResource(R.string.colortools_ei_shot), eis, d.eiShot, "drtEiShot") { set(d.copy(eiShot = it, ei = if (it == 0) 0 else d.ei)) }
-            }
-            Box(Modifier.weight(1f)) {
-                se.gendut.klipp.DropField(stringResource(R.string.colortools_ei_rate), eis, d.ei, "drtEi") { set(d.copy(ei = it)) }
-            }
-        }
-        d.clipStops?.let { st ->
-            val gain = d.eiGain
-            Text(
-                stringResource(R.string.colortools_ei_note, "%.1f".format(st)) + if (gain != 1f) " · " + "%+.2f EV".format(kotlin.math.log2(gain)) else "",
-                color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
-            )
-        }
-    }
     SubLabel(stringResource(R.string.colortools_look))
     androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         se.gendut.klipp.engine.OpenDrt.LOOKS.forEachIndexed { i, l -> ToggleChip(l, d.look == i, { set(d.copy(look = i)) }, Modifier.testTag("drtLook:$i")) }
