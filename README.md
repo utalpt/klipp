@@ -1,9 +1,10 @@
 # 🎬 Klipp
 
 > 🧪 **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only)
-> on the `xiaomi-17u` branch. Its focus is log video from stock camera mods for the Xiaomi Ultra phones, and
-> Dolby Vision, while staying a general video editor. Built and tested on a Xiaomi 17 Ultra, not specific
-> to it. It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
+> on the `xiaomi-17u` branch. Its focus is log video and Dolby Vision from the stock camera mods for the Xiaomi 17, 15
+> and 14 Ultra, while staying a general video editor. It runs on any Android 10+ phone (64-bit); built and tested
+> on a Xiaomi 17 Ultra. HLG export needs a 10-bit HDR HEVC encoder; the Dolby Vision options only show on phones
+> with a Dolby Vision encoder (the 17 Ultra has one; the 15 and 14 Ultra not checked yet). It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
 > Klipp as pull requests; issues with the fork's own features go here, not to Klipp.
 
 ## 🧪 What Klipp Lab adds
@@ -17,7 +18,8 @@
 - 📈 **Bitrates above the encoder's listed limit:** the phone lists 160 Mbps for Dolby Vision; Klipp Lab passes the
   chosen bitrate on, up to 300 Mbps. Use CBR for Dolby Vision – in VBR the encoder keeps the bitrate low.
 - 🎚️ **EI per clip:** the EI a log clip was shot at and the EI it is rated at, applied before all nodes, LUTs and
-  OpenDRT, with where the sensor clips (the 0.0072 × EI relation from George Kiarie's RawViewer).
+  OpenDRT; for the 17 Ultra mods also where the sensor clips (the 0.0072 × EI relation from George Kiarie's
+  RawViewer).
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
 - 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
