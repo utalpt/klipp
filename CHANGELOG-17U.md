@@ -23,6 +23,8 @@ Color and export
   at 24 fps became 120 fps with a 120 fps clip).
 - Video picker with "select some" (Android 14+): a "Choose videos" button opens the system's selection again to add
   more; before, with none chosen the picker only said no videos were found.
+- Video picker, Allow access: asks with the system's dialog again, and opens the app's settings only when the system
+  no longer shows it (after "Allow none" in the selection it went straight to the settings).
 - A new project's frame rate from a phone clip snaps to the nearest standard rate within 4 % (60, 120 and the other
   usual rates): a 60 fps clip whose variable rate averaged 58.6 made a 58.598 fps project, which dropped frames on export.
   The NTSC rates (59.94 …) only when the file really is on one.
