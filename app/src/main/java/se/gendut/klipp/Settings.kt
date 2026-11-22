@@ -113,6 +113,10 @@ object AppPrefs {
     fun monitorHeightFor(c: Context, shape: String): Float = p(c).getFloat("monitorH17u_$shape", 0f)
     fun setMonitorHeightFor(c: Context, shape: String, dp: Float) { p(c).edit().putFloat("monitorH17u_$shape", dp).apply() }
 
+    /** Klipp 17U: the picture's share of the width in landscape (the rest is the timeline). */
+    fun landscapeSplit(c: Context): Float = p(c).getFloat("landscapeSplit17u", 0.46f).coerceIn(0.3f, 0.75f)
+    fun setLandscapeSplit(c: Context, f: Float) { p(c).edit().putFloat("landscapeSplit17u", f).apply() }
+
     /** Klipp 17U: imported clips go straight to the end of the timeline (no source/Insert step). */
     fun addOnImport(c: Context): Boolean = p(c).getBoolean("addOnImport17u", true)
     fun setAddOnImport(c: Context, on: Boolean) { p(c).edit().putBoolean("addOnImport17u", on).apply() }
