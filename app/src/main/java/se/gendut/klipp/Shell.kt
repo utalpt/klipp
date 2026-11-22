@@ -813,8 +813,8 @@ private fun ClipDock(state: EditorState) {
             }
             val items = buildList {
                 add(DockItem(Ic.Delete, stringResource(R.string.app_delete), "ctx:delete", tint = K.Error, strong = true, desc = stringResource(R.string.app_delete_leave_gap)) { state.selected?.let { state.requestRemove(it, false) } })
-                // Klipp Lab: delete and close the gap, as for several clips
-                add(DockItem(Ic.Ripple, stringResource(R.string.design_ripple_short), "ctx:ripple", strong = true, desc = stringResource(R.string.app_ripple_delete)) { state.selected?.let { state.requestRemove(it, true) } })
+                // Klipp Lab: the clip (and the ones after it) moves back to the end of the clip before – nothing is deleted
+                add(DockItem(Ic.Ripple, stringResource(R.string.design_ripple_short), "ctx:closeGap", strong = true, desc = stringResource(R.string.app17u_close_gap_before)) { state.selected?.let { state.closeGapBefore(it) } })
                 val split = DockItem(Ic.Split, stringResource(R.string.app_split), "ctx:split") { state.selected?.let { state.split(it, state.playhead) } }
                 when {
                     isTitle -> {

@@ -958,20 +958,42 @@ class EditorState(initial: List<Clip> = initialClips()) {
             if (total > 0f) shift[c.id] = total
         }
         if (gaps == 0) { onNotice?.invoke(Str.t(R.string.model17u_no_gaps)); return 0 }
+        return if (shiftBack(own, shift, live)) gaps else 0
+    }
+
+    /**
+     * Klipp Lab: close the gap before clip [id]: it moves back to the end of the clip before it on its track (or to
+     * the start), and the clips after it move back as much, linked partners with them. One undo.
+     */
+    fun closeGapBefore(id: Long): Boolean {
+        val c = clips.firstOrNull { it.id == id } ?: return false
+        if (locked(c.track)) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return false }
+        val live = clips.filter { it.id !in removing }
+        val own = live.filter { it.track == c.track }.sortedBy { it.start }
+        val prevEnd = own.filter { it.id != c.id && it.start < c.start }.maxOfOrNull { it.end } ?: 0f
+        val gap = c.start - prevEnd
+        if (gap <= 0.001f) { onNotice?.invoke(Str.t(R.string.model17u_no_gap_before)); return false }
+        val shift = HashMap<Long, Float>()
+        for (o in own) if (o.start >= c.start - 0.001f) shift[o.id] = gap
+        return shiftBack(own, shift, live)
+    }
+
+    /** Moves the clips in [shift] back by their amount, linked partners with them (one undo). False when blocked. */
+    private fun shiftBack(own: List<Clip>, shift: HashMap<Long, Float>, live: List<Clip>): Boolean {
         for (c in own) shift[c.id]?.let { s -> for (p in partnersOf(c)) if (p.id !in shift) shift[p.id] = s }
         val moving = live.filter { it.id in shift }
-        if (moving.any { locked(it.track) }) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return 0 }
+        if (moving.any { locked(it.track) }) { onNotice?.invoke(Str.t(R.string.model_track_locked)); return false }
         // a partner on another track may only move into free space there
         val blocked = moving.any { m ->
             val s = m.start - shift.getValue(m.id)
             live.any { o -> o.track == m.track && o.id !in shift && o.start < s + m.length - 0.001f && o.end > s + 0.001f }
         }
-        if (blocked) { onNotice?.invoke(Str.t(R.string.model17u_gap_blocked)); return 0 }
+        if (blocked) { onNotice?.invoke(Str.t(R.string.model17u_gap_blocked)); return false }
         // earliest first: each clip lands where the one before has already left
         val moves = moving.sortedBy { it.start }.map { Triple(it, it.start - shift.getValue(it.id), it.track) }
-        backend?.let { it.moveMany(moves, false); return gaps }
+        backend?.let { it.moveMany(moves, false); return true }
         commit(clips.map { c -> shift[c.id]?.let { c.copy(start = c.start - it) } ?: c })
-        return gaps
+        return true
     }
 
     /** Move a clip. With engine: overwrite (Select) or insert (Ripple). */

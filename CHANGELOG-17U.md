@@ -52,8 +52,9 @@ Color and export
 
 Import and timeline
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
-  sound or picture with it; the space before the first clip stays), one undo. A selected clip also has Close gap next
-  to Delete (deletes it and closes the gap), as several selected clips already had.
+  sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
+  Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is
+  deleted.
 - Klipp Lab's own video picker: the phone's videos newest first, by folder, with previews of 10-bit log video (the
   system pickers show none), real file names, duration, resolution and date; hidden and ".pending" files left out.
   Picked in order, numbered. "Files app" opens the system picker for anything else. Asks for the videos read

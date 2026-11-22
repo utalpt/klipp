@@ -337,6 +337,8 @@
     <string name="timeline17u_close_gaps">Close gaps</string>
     <string name="model17u_no_gaps">No gaps between the clips on this track</string>
     <string name="model17u_gap_blocked">A linked clip on another track has no room to move back – free that space first</string>
+    <string name="model17u_no_gap_before">No gap before this clip</string>
+    <string name="app17u_close_gap_before">Move the clip (and the ones after it) back to the clip before</string>
     <string name="projects17u_select">Select projects</string>
     <string name="projects17u_select_several">Select several</string>
     <string name="projects17u_selected">%1$d selected</string>

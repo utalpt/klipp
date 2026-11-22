@@ -337,6 +337,8 @@
     <string name="timeline17u_close_gaps">Stäng luckor</string>
     <string name="model17u_no_gaps">Inga luckor mellan klippen på det här spåret</string>
     <string name="model17u_gap_blocked">Ett länkat klipp på ett annat spår har inte plats att flytta bakåt – frigör den platsen först</string>
+    <string name="model17u_no_gap_before">Ingen lucka före det här klippet</string>
+    <string name="app17u_close_gap_before">Flytta klippet (och de efter) bakåt till klippet före</string>
     <string name="projects17u_select">Välj projekt</string>
     <string name="projects17u_select_several">Välj flera</string>
     <string name="projects17u_selected">%1$d valda</string>
