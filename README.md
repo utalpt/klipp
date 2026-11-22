@@ -3,8 +3,8 @@
 > **This is Klipp Lab** (formerly Klipp 17U), a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren
 > (GPL-3.0-only) on the `xiaomi-17u` branch, where features are tried before they're offered to Klipp: HLG export
 > through the grade's OpenDRT, correct levels for video files without a transfer tag, a LUT browser, a video picker
-> with previews of log footage and more. Its priority is working well with George's camera mods for the Xiaomi Ultra
-> phones (S-Log3 and log video, HLG out) while staying a general video editor; it's built and tested on a Xiaomi
+> with previews of log footage and more. Its priority is log video, above all from George's camera mods for the
+> Xiaomi Ultra phones (S-Log3, HLG out), with their Dolby Vision video next, while staying a general video editor; it's built and tested on a Xiaomi
 > 17 Ultra but isn't specific to it. It installs beside Klipp as **Klipp Lab**
 > (`x17u.klipp.editor`). What the fork changes: [CHANGELOG-17U.md](CHANGELOG-17U.md). APKs: the
 > [Releases](https://github.com/utalpt/klipp/releases) page; the latest CI build of `xiaomi-17u` is always at

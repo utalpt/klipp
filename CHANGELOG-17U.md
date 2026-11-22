@@ -5,8 +5,9 @@ Klipp Lab is a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbja
 fork's release number (`0.21.0-beta.1-17u.1` = Klipp 0.21.0-beta.1, fork release 1). Everything in Klipp's own
 changelog for that version applies too; this file lists only what the fork adds or changes.
 
-The fork's priority: working well with George's camera mods for the Xiaomi Ultra phones (their S-Log3 and log
-video, HLG out), while staying a general video editor for any phone and any footage.
+The fork's priority: log video, above all from George's camera mods for the Xiaomi Ultra phones (their S-Log3 and
+other log profiles, HLG out); their Dolby Vision video next. All while staying a general video editor for any phone
+and any footage.
 
 ## Next release (unreleased)
 
