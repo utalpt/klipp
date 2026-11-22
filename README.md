@@ -24,6 +24,12 @@
   RawViewer).
 - 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
   linear light before all nodes, as in a raw developer – live while dragging.
+- 📸 **MotionCam RAW (.mcraw) in:** the video picker's MotionCam RAW chip lists the .mcraw files of MotionCam's folder; importing
+  develops each one into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
+  with the camera's white balance. The RAW settings stay changeable afterwards, as in a raw developer: on the Color page
+  pick another EI or log and Develop again (the clip is swapped in place, with a new proxy), and the clip's
+  Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. *(Early:
+  feedback welcome.)*
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
 - 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
@@ -40,7 +46,7 @@
 - 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – proxies, node cache, renders,
   each with its Clear, plus Clear caches – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off);
   opening a project then says what each kind takes.
-- 🎓 **Grading for beginners** (Settings): the fundamental steps from log footage to a finished image.
+- 🎓 **Grading for beginners** (Settings): the fundamental steps from log or MotionCam RAW footage to a finished image.
 - ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
   size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
