@@ -273,6 +273,8 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                 Opt(1, stringResource(R.string.settings_tonemap_codec), stringResource(R.string.settings_tonemap_codec_hint), enabled = android.os.Build.VERSION.SDK_INT >= 33, key = "tmCodec"),
             ), vp.hdrToneMap, "set:toneMap") { vp.setHdrToneMap(ctx, it) }
             Text(stringResource(R.string.settings_ten_bit_note), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            // Klipp Lab: how fast this phone decodes MotionCam RAW (first step towards importing .mcraw)
+            McrawProbeRow(ctx)
 
                 }
                 3 -> PanelCard(Modifier.padding(top = 8.dp)) {

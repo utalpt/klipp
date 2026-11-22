@@ -32,3 +32,24 @@ target_compile_options(klipp_whisper PRIVATE -O3 -march=armv8.2-a+dotprod+fp16 -
 target_link_options(klipp_whisper PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 find_library(LOG_LIB log)
 target_link_libraries(klipp_whisper ggml ${LOG_LIB} android)
+
+# Klipp Lab: MotionCam .mcraw reading (mcraw_jni.cpp) with MotionCam's own decoder library, motioncam-decoder
+# (Apache-2.0, https://github.com/mirsadm/motioncam-decoder), fetched at a pinned commit. Only its sources are built
+# here (its own CMakeLists adds an example, tests and -Werror): SOURCE_SUBDIR points at a folder without one.
+include(FetchContent)
+FetchContent_Declare(motioncam_decoder
+    GIT_REPOSITORY https://github.com/mirsadm/motioncam-decoder.git
+    GIT_TAG b931ec0e2466c8217c49f13df925531b78f76e33
+    SOURCE_SUBDIR no-cmake-here)
+FetchContent_MakeAvailable(motioncam_decoder)
+set(MCD ${motioncam_decoder_SOURCE_DIR})
+add_library(klipp_mcraw SHARED
+    ${MCD}/lib/Decoder.cpp
+    ${MCD}/lib/RawData.cpp
+    ${MCD}/lib/RawData_Legacy.cpp
+    mcraw_jni.cpp
+)
+target_include_directories(klipp_mcraw PRIVATE ${MCD}/lib/include ${MCD}/thirdparty ${MCD}/motioncam_decoder)
+target_compile_options(klipp_mcraw PRIVATE -O3 -fexceptions -frtti -fvisibility=hidden -ffunction-sections -fdata-sections)
+target_link_options(klipp_mcraw PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+target_link_libraries(klipp_mcraw ${LOG_LIB})

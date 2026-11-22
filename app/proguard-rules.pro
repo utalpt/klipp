@@ -5,6 +5,8 @@
 -keep class se.gendut.klipp.engine.Engine { native <methods>; }
 -keep class se.gendut.klipp.engine.Engine$Companion { *; }
 -keep class se.gendut.klipp.engine.Whisper { native <methods>; *; }
+# Klipp Lab: MotionCam .mcraw (libklipp_mcraw)
+-keep class se.gendut.klipp.engine.Mcraw { native <methods>; }
 
 # whisper_jni.cpp anropar lyssnarens onProgress(int) via GetMethodID – namnet och signaturen måste finnas kvar.
 -keep interface se.gendut.klipp.engine.Whisper$Listener { *; }

@@ -51,6 +51,10 @@ Color and export
   encoding itself is Media3's.
 
 Import and timeline
+- MCRAW test (Settings → video tab): pick a MotionCam .mcraw file; it is read with MotionCam's own decoder library
+  (motioncam-decoder, Apache-2.0) and shows how fast the phone decodes it (one and four threads), the file's metadata
+  and a quick preview of the middle frame. First step towards importing .mcraw; the log goes to
+  Android/data/x17u.klipp.editor/files/mcraw_probe.txt.
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
   sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
   Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is

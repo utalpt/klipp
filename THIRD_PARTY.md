@@ -26,6 +26,7 @@ notices are in **`LICENSES/`** and ship inside the app (Settings → About → L
 | **Checker Framework qualifiers** 3.43.0 – © the Checker Framework developers | classes.dex | MIT (`LICENSES/third-party/maven/checker-qual-LICENSE.txt`) | None |
 | **spektrafilm** (code) – © Andrea Volpato et al. | ported to `engine/Spektra.kt`, `engine/FilmFx.kt`, `engine/FilmGl.kt` | GPL v3 ("GPLv3"; its CITATION.cff says or-later; Klipp uses it under version 3) | Ported to Kotlin/GLSL |
 | **OpenDRT** v1.1.0 – Jed Smith | ported to `engine/OpenDrt.kt` | GPL v3 ("License: GPLv3" in its notice; Klipp uses it under version 3) | Ported; SDR, and in Klipp Lab its Rec.2100 HLG encoding; two inputs added |
+| **motioncam-decoder** (commit b931ec0, github.com/mirsadm/motioncam-decoder) – © MotionCam | fetched by `app/src/main/cpp/CMakeLists.txt` → `libklipp_mcraw.so` (Klipp Lab: reading MotionCam .mcraw) | Apache-2.0 | None |
 
 ## Data and fonts in the app (assets)
 
