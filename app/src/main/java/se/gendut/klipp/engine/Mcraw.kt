@@ -24,6 +24,7 @@ object Mcraw {
     @JvmStatic private external fun nativePreview(h: Long, out: IntArray, w: Int, h2: Int): Boolean
     @JvmStatic private external fun nativeDecodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String?
     @JvmStatic private external fun nativeLastLitRow(h: Long): Int
+    @JvmStatic private external fun nativeEmptyBottomRows(h: Long, limit: Int): Int
     @JvmStatic private external fun nativeLoadAudio(h: Long): Long
     @JvmStatic private external fun nativeAudioStart(h: Long): Long
     @JvmStatic private external fun nativeAudioCopy(h: Long, out: ShortArray)
@@ -42,6 +43,8 @@ object Mcraw {
     internal fun close(h: Long) = nativeClose(h)
     internal fun info(h: Long): String = nativeInfo(h)
     internal fun decodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String? = nativeDecodeTo(h, index, out)
+    /** Padding rows at the bottom of the frame last decoded with [decodeTo] (all at or under [limit]). */
+    internal fun emptyBottomRows(h: Long, limit: Int): Int = nativeEmptyBottomRows(h, limit)
 
     class Probe(val summary: String, val log: String, val preview: Bitmap?, val logFile: File?)
 

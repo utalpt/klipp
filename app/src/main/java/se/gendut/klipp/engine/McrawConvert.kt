@@ -60,8 +60,16 @@ object McrawConvert {
             val fps = if (n > 1) (n - 1) / ((frames.getLong(n - 1) - t0ns) / 1e9) else 30.0
             line("convert: $name  ${w}x$hh  $n frames  ${"%.3f".format(fps)} fps")
 
-            // the encoder's size: the file's own, else the largest of the same shape it takes
-            val (ow, oh, codecName) = pickSize(w, hh, fps) ?: return Result(null, "No HEVC 10-bit encoder for this size", log.toString())
+            // MotionCam pads the frame's buffer below the picture (4096×3072 holding a 4096×2560 picture): those rows,
+            // all at the black level with no noise, are left out – the clip is the picture's own height
+            val blackMax = (c.optJSONArray("blackLevel")?.let { a -> (0 until a.length()).maxOf { a.getDouble(it) } } ?: 0.0).toInt() + 1
+            val probeBuf = ByteBuffer.allocateDirect(w * hh * 2)
+            val empty = if (Mcraw.decodeTo(h, n / 2, probeBuf) != null) Mcraw.emptyBottomRows(h, blackMax) else 0
+            val ch = if (empty >= hh / 20) ((hh - empty) / 16 * 16).coerceAtLeast(16) else hh
+            if (ch != hh) line("picture height: $ch of $hh (the rest is padding)")
+
+            // the encoder's size: the picture's own, else the largest of the same shape it takes
+            val (ow, oh, codecName) = pickSize(w, ch, fps) ?: return Result(null, "No HEVC 10-bit encoder for this size", log.toString())
             line("encoder: $codecName  ${ow}x$oh")
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
@@ -156,7 +164,7 @@ object McrawConvert {
                     }
                 }
 
-                val gl = Gl(inputSurface, w, hh, ow, oh)
+                val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
                     gl.setup(cfa, c, camToOut)
                     for (k in 0 until n) {
@@ -310,7 +318,8 @@ object McrawConvert {
 
     // ---- GPU ----
 
-    private class Gl(surface: android.view.Surface, val w: Int, val h: Int, val ow: Int, val oh: Int) {
+    /** [h] the frame's rows (texture), [ch] the rows with picture (from the top), [ow] × [oh] the output. */
+    private class Gl(surface: android.view.Surface, val w: Int, val h: Int, val ch: Int, val ow: Int, val oh: Int) {
         val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         val context: EGLContext
         val eglSurface: EGLSurface
@@ -352,8 +361,9 @@ object McrawConvert {
             GLES30.glUniform1i(loc("shade"), 1)
             GLES30.glUniform4i(loc("colorAt"), colorAt[0], colorAt[1], colorAt[2], colorAt[3])
             GLES30.glUniform4i(loc("shadeAt"), shadeAt[0], shadeAt[1], shadeAt[2], shadeAt[3])
-            GLES30.glUniform2i(loc("size"), w, h)
-            GLES30.glUniform2f(loc("scale"), w / ow.toFloat(), h / oh.toFloat())
+            GLES30.glUniform2i(loc("size"), w, ch)
+            GLES30.glUniform2i(loc("full"), w, h)
+            GLES30.glUniform2f(loc("scale"), w / ow.toFloat(), ch / oh.toFloat())
             GLES30.glUniformMatrix3fv(loc("camToOut"), 1, true, camToOut, 0)
             GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, HEADROOM.toDouble()).toFloat())
             GLES30.glViewport(0, 0, ow, oh)
@@ -474,7 +484,8 @@ uniform usampler2D raw;
 uniform highp sampler2D shade;
 uniform ivec4 colorAt;
 uniform ivec4 shadeAt;
-uniform ivec2 size;
+uniform ivec2 size;   // the picture (rows from the top)
+uniform ivec2 full;   // the whole frame: the lens shading map covers it
 uniform ivec2 grid;
 uniform int useShade;
 uniform vec2 scale;
@@ -493,7 +504,7 @@ float atf(vec4 v, int i) { return i == 0 ? v.x : i == 1 ? v.y : i == 2 ? v.z : v
 // the lens shading gain of map channel ch at pixel p (bilinear on the grid)
 float shading(int ch, ivec2 p) {
     if (useShade == 0) return 1.0;
-    vec2 g = (vec2(p) + 0.5) / vec2(size) * vec2(grid - 1);
+    vec2 g = (vec2(p) + 0.5) / vec2(full) * vec2(grid - 1);
     ivec2 g0 = clamp(ivec2(floor(g)), ivec2(0), grid - 1);
     ivec2 g1 = min(g0 + 1, grid - 1);
     vec2 f = g - vec2(g0);

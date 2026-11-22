@@ -62,6 +62,8 @@ Import and timeline
 - Import a MotionCam .mcraw: Import → Files app now lists .mcraw files too; a picked one is developed to S-Log3 /
   S-Gamut3.Cine (as above, with a progress dialog) and the clip goes in with the rest – Klipp's default input, so no
   setting to change.
+- MCRAW: the padding MotionCam leaves below the picture (a 4096×3072 frame holding a 4096×2560 picture, the rest at
+  the black level) is left out: the clip is the picture's own size, without the black band at the bottom.
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
   sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
   Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is

@@ -170,6 +170,23 @@ JNIEXPORT void JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeAudioCopy(JNIEnv*
     env->SetShortArrayRegion(out, 0, n, h->audio.data());
 }
 
+/**
+ * Rows at the bottom of the last decoded frame that are padding: every pixel at or under [limit] (the black level,
+ * without the sensor's noise). MotionCam fills the frame's buffer below the picture this way.
+ */
+JNIEXPORT jint JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeEmptyBottomRows(JNIEnv*, jclass, jlong hp, jint limit) {
+    auto* h = get(hp);
+    int w = h->meta.value("width", 0), ht = h->meta.value("height", 0);
+    if (w <= 0 || ht <= 0 || h->data.size() < (size_t) w * ht * 2) return 0;
+    const auto* px = reinterpret_cast<const uint16_t*>(h->data.data());
+    int n = 0;
+    for (int y = ht - 1; y >= 0; y--, n++) {
+        const uint16_t* row = px + (size_t) y * w;
+        for (int x = 0; x < w; x++) if (row[x] > limit) return n;
+    }
+    return n;
+}
+
 /** Bytes in the last decoded frame (expected width × height × 2). */
 JNIEXPORT jlong JNICALL Java_se_gendut_klipp_engine_Mcraw_nativeLastBytes(JNIEnv*, jclass, jlong hp) {
     return (jlong) get(hp)->data.size();
