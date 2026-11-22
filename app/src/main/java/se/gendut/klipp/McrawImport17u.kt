@@ -31,7 +31,8 @@ suspend fun importMcraw17u(ctx: Context, picked: List<Uri>, status: (String) -> 
             se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey) { p -> status("Developing $name to $outName… ${(p * 100).toInt()} %") }
         }
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
-        if (r.uri != null) out += r.uri
+        // its proxy right away (playing the 4K 60 fps develop itself freezes the picture)
+        if (r.uri != null) { out += r.uri; se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
         else { status("$name: ${r.summary}"); kotlinx.coroutines.delay(2500) }
     }
     return out

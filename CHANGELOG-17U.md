@@ -70,6 +70,9 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MCRAW: every develop asks for its playback proxy at once. A develop made again (RAW settings) could be left without
+  one – its info was still empty when the proxies were checked – and played from the 4K 60 fps file, with the picture
+  standing still.
 - MCRAW → HLG without setting up OpenDRT: with MotionCam clips on the timeline, HLG · OpenDRT (and Dolby Vision ·
   OpenDRT) can be chosen in the export even when they have no OpenDRT yet; exporting adds it to their grades (on
   the last node when it does nothing yet, else a node of its own), with the develop's curve as its input – one undo

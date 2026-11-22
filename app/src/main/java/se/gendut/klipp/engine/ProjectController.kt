@@ -110,7 +110,7 @@ class ProjectController(
                     .put("path", FdPath.of(pfd.fd, displayName(new), context.contentResolver.getType(new))).put("force", true)).isSuccess
                 if (ok) { fds += pfd; uris[id] = new; n++ } else runCatching { pfd.close() }
             }
-            if (n > 0) { refresh(true); saveLocked() }
+            if (n > 0) { refresh(true); saveLocked(); Proxies.request(context, new) }
         }
     }
 
