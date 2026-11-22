@@ -30,6 +30,9 @@ Import and timeline
 - Media panel: with clips selected, "Add N to the timeline, in this order", each selected card numbered.
 - Timeline selection box (hold on an empty area and drag): near the left or right edge the timeline scrolls on its
   own, so the box reaches clips off screen.
+- Speed → Conform (e.g. "Conform 120→24"): for a clip shot at a higher frame rate than the project's, sets the
+  speed so every source frame is used once (120 → 24 fps = 20 %, 5× slower), no frame repeated or dropped. "≈" when
+  the rates don't divide into a whole percent (120 → 25). Idea from George Kiarie's RawViewer.
 
 Layout
 - Full screen: status and navigation bars hidden (swipe from the edge to see them); the top bar moves up to just
