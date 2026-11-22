@@ -19,6 +19,9 @@ Color and export
 - LUT import: several .cube files and .zip packs at once; a zip's folders become groups. Hold a LUT to select
   several (tap a group's name for the whole group) and delete them.
 
+- A new project's frame rate from a phone clip snaps to the nearest standard rate within 4 % (60, 120 and the other
+  usual rates): a 60 fps clip whose variable rate averaged 58.6 made a 58.598 fps project, which dropped frames on export.
+  The NTSC rates (59.94 …) only when the file really is on one.
 - EI per clip (Color → the "EI" chip before the nodes, or the grid → Clip grade): the clip's log curve, the EI it was
   shot at and the EI it is rated at. Applied before all the clip's nodes: the log is decoded, the light scaled by
   rated / shot (as rating a cinema camera's log footage) and encoded again, so every node, LUT and OpenDRT gets the

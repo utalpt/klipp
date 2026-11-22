@@ -269,8 +269,14 @@ class ProjectController(
 
     private fun normalizeFps(f: Double): Double {
         // phone video often reports e.g. 29.98 or 59.93 – round to standard values
-        val std = listOf(23.976, 24.0, 25.0, 29.97, 30.0, 50.0, 59.94, 60.0)
-        return std.minBy { abs(it - f) }.takeIf { abs(it - f) < 0.6 } ?: f
+        // Klipp Lab: phones record a variable frame rate whose average can lie further off (a Xiaomi 17 Ultra 60 fps
+        // clip measured 58.6 and became a 58.598 fps project: every frame on a slightly slow grid, some dropped). The
+        // NTSC rates only when the file is really on one; otherwise the nearest whole standard rate within 4 %
+        // (high frame rates included: 100, 120, 240).
+        val ntsc = listOf(23.976, 29.97, 59.94, 119.88)
+        ntsc.firstOrNull { abs(it - f) < 0.03 }?.let { return it }
+        val std = listOf(24.0, 25.0, 30.0, 48.0, 50.0, 60.0, 90.0, 100.0, 120.0, 240.0)
+        return std.minBy { abs(it - f) }.takeIf { abs(it - f) <= it * 0.04 } ?: f
     }
 
     private fun displayName(u: Uri): String =
