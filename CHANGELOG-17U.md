@@ -57,7 +57,8 @@ Import and timeline
   Android/data/x17u.klipp.editor/files/mcraw_probe.txt.
 - MCRAW → S-Log3 (in the MCRAW test's result: Convert to S-Log3): develops the .mcraw on the GPU – the frame's own
   black level, MotionCam's lens shading map, as-shot white balance, demosaic, the camera's colour matrix, S-Gamut3 and
-  S-Log3, the sensor's clip at EI 800 – into a 10-bit HEVC clip in Movies/Klipp Lab, timed. Picture only for now.
+  S-Log3, the sensor's clip at EI 800 – into a 10-bit HEVC clip in Movies/Klipp Lab (BT.2020, SDR transfer tag,
+  limited range, so Klipp edits it as log), timed. Picture only for now.
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
   sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
   Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is

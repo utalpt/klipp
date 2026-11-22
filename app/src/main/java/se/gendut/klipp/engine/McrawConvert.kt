@@ -23,7 +23,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.ArrayBlockingQueue
 
 /**
- * Klipp Lab: develops a MotionCam .mcraw into an S-Log3 / S-Gamut3 clip (10-bit HEVC, BT.2020 tags, full range) that
+ * Klipp Lab: develops a MotionCam .mcraw into an S-Log3 / S-Gamut3 clip (10-bit HEVC, BT.2020, limited range) that
  * Klipp then edits like any log clip (input "Sony S-Log3 / S-Gamut3", EI and grade as usual).
  *
  * Per frame, on the GPU: the frame's own black level, the lens shading map (MotionCam doesn't bake it in), the as-shot
@@ -115,9 +115,13 @@ object McrawConvert {
                     setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
                     setFloat(MediaFormat.KEY_FRAME_RATE, fps.toFloat())
                     setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-                    // log picture in BT.2020 primaries, full range; no transfer tag (S-Log3 has none in the standard set)
+                    // log picture in BT.2020 primaries. The transfer must be given: left out, the Qualcomm encoder tagged
+                    // the file PQ (ST 2084) and Klipp took it for HDR (no EI, tone-mapped preview). S-Log3 has no tag of
+                    // its own, so SDR video, as the clips Klipp edits as log. Limited range: the encoder writes limited
+                    // codes from the surface whatever the range asked for (it tagged them full).
                     setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT2020)
-                    setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_FULL)
+                    setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
+                    setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
                 }
                 val codec = MediaCodec.createByCodecName(codecName)
                 codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
