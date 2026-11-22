@@ -361,7 +361,8 @@ private fun KlippAppContent(
         }
         // color-graded clips always become SDR (grading is done in SDR) – except HLG made from the grades' OpenDRT
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
-        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.values, lookOf(grade))) it.copy(hlg = false) else it }
+        val liveIds = c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.map { it.id } }.toSet()
+        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.filterKeys { k -> k in liveIds }.values, lookOf(grade))) it.copy(hlg = false) else it }
         // everything the export reads, taken now: the job outlives this screen (and its controller)
         val snap = c.snapshot
         val uris = c.frozenUris()
@@ -429,9 +430,13 @@ private fun KlippAppContent(
     if (exportAsk && controller != null) {
         val q = controller.snapshot.sequence
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
+        // Klipp Lab: only the clips on the timeline count (grades of deleted clips are kept for undo – as Klipp's own
+        // fix in alpha 241, 2797f03 by Flabbjaxaren), and MotionCam clips with the OpenDRT that choosing HLG gives them
         val gradesForHlg17u = remember(controller.revision, gs.revision) {
-            val fix = mcrawHlgGrades17u(context, q?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to controller.uriOf(it.item) } }, gs)
-            (gs.grades + fix).values
+            val onTimeline = q?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to controller.uriOf(it.item) } }
+            val fix = mcrawHlgGrades17u(context, onTimeline, gs)
+            val ids = onTimeline.map { it.first }.toSet()
+            (gs.grades + fix).filterKeys { it in ids }.values
         }
         val anyHdr = remember(controller.revision) { se.gendut.klipp.engine.CompositionBuilder.anyHdr(context, controller.snapshot) { controller.uriOf(it) } }
         // 10-bit sources (Auto bit depth follows them) – read from the files, off the main thread
