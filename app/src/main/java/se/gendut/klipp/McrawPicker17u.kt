@@ -65,6 +65,9 @@ object McrawFolder17u {
     fun ei(c: Context): Int = p(c).getInt("ei", 800)
     fun setEi(c: Context, ei: Int) { p(c).edit().putInt("ei", ei).apply() }
     val EIS = listOf(400, 800, 1600, 3200)
+    /** The output the files are developed into (an OpenDrt.Input key; S-Log3 / S-Gamut3.Cine by default). */
+    fun out(c: Context): String = p(c).getString("out", null) ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key
+    fun setOut(c: Context, k: String) { p(c).edit().putString("out", k).apply() }
 
     class File(val uri: Uri, val name: String, val bytes: Long, val time: Long)
 
@@ -106,6 +109,9 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
             items(McrawFolder17u.EIS) { v -> ToggleChip("$v", ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.testTag("mcraw:ei$v")) }
         }
     }
+    var outKey by remember { mutableStateOf(McrawFolder17u.out(ctx)) }
+    val outs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
+    DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out") { outKey = it; McrawFolder17u.setOut(ctx, it) }
     if (tree == null) {
         Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Pick MotionCam's folder once (usually Documents/MotionCam): its .mcraw files show here, developed to S-Log3 when imported.",

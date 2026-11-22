@@ -46,7 +46,9 @@ object McrawConvert {
      * [outFile]: the clip goes there (the app's own storage, see McrawStore17u) instead of Movies/Klipp Lab. [ei]: the
      * EI to develop at (else the picker's setting).
      */
-    fun convert(ctx: Context, src: Uri, draft: Boolean = false, outFile: java.io.File? = null, ei: Int? = null, progress: (Float) -> Unit): Result {
+    fun convert(ctx: Context, src: Uri, draft: Boolean = false, outFile: java.io.File? = null, ei: Int? = null,
+                out: String = OpenDrt.Input.SLOG3.key, progress: (Float) -> Unit): Result {
+        val outIn = OpenDrt.Input.of(out)
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
         if (!Mcraw.available) return Result(null, "MCRAW library not loaded", "")
@@ -85,8 +87,8 @@ object McrawConvert {
             val ei = ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)
             line("developed at EI $ei (sensor clip ${"%.1f".format(headroom(ei))} stops over 18 % grey)")
             val cfa = c.optString("sensorArrangment", "rggb")
-            val camToOut = colorMatrix(c, ff)
-            line("cfa $cfa  camera → S-Gamut3.Cine: ${camToOut.joinToString { "%.4f".format(it) }}")
+            val camToOut = colorMatrix(c, ff, outIn.gamut)
+            line("cfa $cfa  camera → ${outIn.label}: ${camToOut.joinToString { "%.4f".format(it) }}")
 
             // output file: the given one (written as .part, renamed when done), else in Movies/Klipp Lab
             val base = name.substringBeforeLast('.')
@@ -183,7 +185,7 @@ object McrawConvert {
 
                 val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
-                    gl.setup(cfa, c, camToOut, headroom(ei), draft)
+                    gl.setup(cfa, c, camToOut, headroom(ei), draft, outIn.oetf)
                     for (k in 0 until n) {
                         val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
@@ -211,7 +213,7 @@ object McrawConvert {
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                (outFile?.name ?: "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4") + " – " + "${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
+                (outFile?.name ?: "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4") + " – " + "${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input ${outIn.label}, developed at EI $ei."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
@@ -307,13 +309,23 @@ object McrawConvert {
 
     private fun arr(o: JSONObject, key: String): FloatArray? = o.optJSONArray(key)?.let { a -> FloatArray(a.length()) { a.getDouble(it).toFloat() } }
 
-    /** 3×3 row-major: white-balanced camera RGB → linear S-Gamut3.Cine (D65). */
-    internal fun colorMatrix(c: JSONObject, ff: JSONObject): FloatArray {
+    /**
+     * 3×3 row-major: white-balanced camera RGB → the linear output gamut ([outToXyz], S-Gamut3.Cine by default; D65).
+     * The rows are scaled so the camera's neutral stays neutral in a gamut with another white (ACES AP1).
+     */
+    internal fun colorMatrix(c: JSONObject, ff: JSONObject, outToXyz: FloatArray = OpenDrt.M.SGAMUT3CINE_TO_XYZ): FloatArray {
+        val m = colorMatrix0(c, ff, outToXyz)
+        val sums = FloatArray(3) { r -> m[r * 3] + m[r * 3 + 1] + m[r * 3 + 2] }
+        if (sums.any { it <= 1e-6f }) return m
+        return FloatArray(9) { i -> m[i] * sums[1] / sums[i / 3] }
+    }
+
+    private fun colorMatrix0(c: JSONObject, ff: JSONObject, outToXyz: FloatArray): FloatArray {
         val bradford = floatArrayOf( // D50 → D65
             0.9555766f, -0.0230393f, 0.0631636f,
             -0.0282895f, 1.0099416f, 0.0210077f,
             0.0122982f, -0.0204830f, 1.3299098f)
-        val xyzToSg3 = inv(OpenDrt.M.SGAMUT3CINE_TO_XYZ)
+        val xyzToSg3 = inv(outToXyz)
         val fm = arr(c, "forwardMatrix1")
         if (fm != null && fm.size == 9 && fm.any { it != 0f }) return mul(xyzToSg3, mul(bradford, fm))
         // no forward matrix: XYZ(D65) = inverse(ColorMatrix1) · neutral, scaled so the neutral maps to Y = 1
@@ -345,6 +357,7 @@ object McrawConvert {
         var program = 0
         var rawTex = 0
         var shadeTex = 0
+        var curveTex = 0
         var shadeW = 0; var shadeH = 0
         // the CFA: colour (0 R, 1 G, 2 B) and shading-map channel (0 R, 1 G even, 2 G odd, 3 B) at each 2×2 position
         val colorAt = IntArray(4); val shadeAt = IntArray(4)
@@ -361,7 +374,8 @@ object McrawConvert {
             check(EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) { "eglMakeCurrent failed" }
         }
 
-        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray, headroom: Float, draft: Boolean) {
+        /** [tf]: the output curve ([OpenDrt.Input.oetf]); S-Log3 (8) is computed in the shader, any other from a table. */
+        fun setup(cfa: String, c: JSONObject, camToOut: FloatArray, headroom: Float, draft: Boolean, tf: Int = 8) {
             val pattern = when (cfa.lowercase()) { "bggr" -> "BGGR"; "grbg" -> "GRBG"; "gbrg" -> "GBRG"; else -> "RGGB" }
             var greens = 0
             for (p in 0 until 4) when (pattern[p]) {
@@ -386,6 +400,23 @@ object McrawConvert {
             GLES30.glUniform1i(loc("draft"), if (draft) 1 else 0)
             GLES30.glUniformMatrix3fv(loc("camToOut"), 1, true, camToOut, 0)
             GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, headroom.toDouble()).toFloat())
+            // the output curve as a table over log2(x + 2^-14) from -14 to +8 (x up to ~256 × linear), read with texelFetch
+            GLES30.glUniform1i(loc("useCurve"), if (tf == 8) 0 else 1)
+            GLES30.glUniform1i(loc("curve"), 2)
+            if (tf != 8) {
+                val t2 = IntArray(1); GLES30.glGenTextures(1, t2, 0); curveTex = t2[0]
+                val data = ByteBuffer.allocateDirect(CURVE_N * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+                for (i in 0 until CURVE_N) {
+                    val x = Math.pow(2.0, -14.0 + 22.0 * i / (CURVE_N - 1)) - Math.pow(2.0, -14.0)
+                    data.put(OpenDrt.encode(x.toFloat(), tf).coerceIn(0f, 1f))
+                }
+                data.position(0)
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE2)
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, curveTex)
+                GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_R32F, CURVE_N, 1, 0, GLES30.GL_RED, GLES30.GL_FLOAT, data)
+                nearest()
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+            }
             GLES30.glViewport(0, 0, ow, oh)
         }
 
@@ -496,6 +527,8 @@ void main() {
     gl_Position = vec4(v * 2.0 - 1.0, 0.0, 1.0);
 }"""
 
+    private const val CURVE_N = 4096
+
     private const val FS = """#version 300 es
 precision highp float;
 precision highp int;
@@ -516,6 +549,8 @@ uniform vec3 wb;
 uniform float clipAt;
 uniform mat3 camToOut;
 uniform float expo;
+uniform highp sampler2D curve;
+uniform int useCurve;
 in vec2 pos;
 out vec4 color;
 
@@ -551,6 +586,20 @@ float value(ivec2 p, vec4 sh) {
 float slog3(float x) {
     return x >= 0.01125 ? (420.0 + log((x + 0.01) / 0.19) / log(10.0) * 261.5) / 1023.0
                         : (x * (171.2102946929 - 95.0) / 0.01125 + 95.0) / 1023.0;
+}
+
+// any other output curve: the table (see Gl.setup), linear between its entries
+float fromTable(float x) {
+    float t = clamp((log2(x + 0.00006103515625) + 14.0) / 22.0, 0.0, 1.0) * 4095.0;
+    int i = int(floor(t));
+    float a = texelFetch(curve, ivec2(i, 0), 0).r;
+    float b = texelFetch(curve, ivec2(min(i + 1, 4095), 0), 0).r;
+    return mix(a, b, t - float(i));
+}
+
+vec3 encodeOut(vec3 lin) {
+    if (useCurve == 1) return vec3(fromTable(lin.r), fromTable(lin.g), fromTable(lin.b));
+    return vec3(slog3(lin.r), slog3(lin.g), slog3(lin.b));
 }
 
 void main() {
@@ -597,6 +646,6 @@ void main() {
     // gain at this point, which lifts the clip towards the corners)
     rgb = min(rgb, vec3(clipAt * atf(sh, 1)));
     vec3 lin = max(camToOut * rgb, vec3(0.0)) * expo;
-    color = vec4(slog3(lin.r), slog3(lin.g), slog3(lin.b), 1.0);
+    color = vec4(encodeOut(lin), 1.0);
 }"""
 }

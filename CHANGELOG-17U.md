@@ -70,6 +70,10 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MotionCam RAW settings, changeable at any time (Color → the EI chip → MotionCam RAW): "Develop at EI" and Output
+  (any of Klipp's log curves and gamuts – S-Log3 / S-Gamut3.Cine, LogC3/LogC4, V-Log, DaVinci Intermediate, ACEScct …).
+  Develop makes a new develop from the .mcraw in the background; the clip switches to it when done, keeps its grade,
+  and its input and OpenDRT nodes follow the new curve. The picker's MotionCam RAW chip also has "Develop into".
 - White balance in the clip's input (Color → the EI chip): Temperature (2000–12000 K, "As shot" in the middle) and
   Tint, applied in the linear light on the clip's own primaries before every node – as a raw developer's, live while
   dragging. Works on any log clip; for a MotionCam develop it moves away from the as-shot white. The chip shows "· WB".

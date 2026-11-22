@@ -93,6 +93,25 @@ class ProjectController(
     init {
         state.backend = this
         state.props = this
+        McrawStore17u.relink = { old, new -> relinkMcraw17u(old, new) }
+    }
+
+    /**
+     * Klipp Lab: a MotionCam clip developed again (RAW settings): every media item using [old] now uses [new]
+     * (the same clip, same length, other settings). One save; the old develop is cleaned up once no project uses it.
+     */
+    private fun relinkMcraw17u(old: Uri, new: Uri) = scope.launch {
+        editLock.withLock {
+            var n = 0
+            for ((id, u) in uris.toList()) {
+                if (u != old) continue
+                val pfd = withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { context.contentResolver.openFileDescriptor(new, "r") }.getOrNull() } ?: continue
+                val ok = engine.tryExec("media.relink", JSONObject().put("item", id)
+                    .put("path", FdPath.of(pfd.fd, displayName(new), context.contentResolver.getType(new))).put("force", true)).isSuccess
+                if (ok) { fds += pfd; uris[id] = new; n++ } else runCatching { pfd.close() }
+            }
+            if (n > 0) { refresh(true); saveLocked() }
+        }
     }
 
     /** Set by the UI: opens the file picker for captions. */
@@ -2509,6 +2528,7 @@ class ProjectController(
     }
 
     fun close() {
+        if (McrawStore17u.relink != null) McrawStore17u.relink = null
         // a pending save happens now (a couple of seconds at most), before the engine is released
         if (saveJob?.isActive == true) {
             saveJob?.cancel()

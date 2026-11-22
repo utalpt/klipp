@@ -23,10 +23,12 @@ suspend fun importMcraw17u(ctx: Context, picked: List<Uri>, status: (String) -> 
     for ((i, u) in picked.withIndex()) {
         val name = names[i]
         if (!name.endsWith(".mcraw", ignoreCase = true)) { out += u; continue }
-        status("Developing $name to S-Log3…")
+        val outKey = McrawFolder17u.out(ctx)
+        val outName = se.gendut.klipp.engine.OpenDrt.Input.of(outKey).label
+        status("Developing $name to $outName…")
         val r = withContext(Dispatchers.Default) {
             // (the status is Compose state: setting it from the conversion's thread is fine)
-            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx)) { p -> status("Developing $name to S-Log3… ${(p * 100).toInt()} %") }
+            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey) { p -> status("Developing $name to $outName… ${(p * 100).toInt()} %") }
         }
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
         if (r.uri != null) out += r.uri

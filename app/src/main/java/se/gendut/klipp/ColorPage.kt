@@ -794,7 +794,7 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
     val g = gs.of(current.id)
     // (the curve: the clip's own, else the first OpenDRT node's, else S-Log3)
     val ei = g.ei ?: se.gendut.klipp.engine.InputEi(g.nodes.firstNotNullOfOrNull { it.drt }?.input ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key)
-    fun keep(e: se.gendut.klipp.engine.InputEi) = e.takeIf { it.shot > 0 || it.hasWb }
+    fun keep(e: se.gendut.klipp.engine.InputEi) = e.takeIf { it.shot > 0 || it.hasWb || it.input != se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key }
     fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = keep(e)))
     fun live(e: se.gendut.klipp.engine.InputEi) = gs.setLive(current.id, (gs.shown(current.id) ?: g).copy(ei = keep(e)))
     Text(stringResource(R.string.colorpage_input_title), color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp))
@@ -830,6 +830,7 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
     PropSlider(stringResource(R.string.colorpage17u_wb_tint), ei.tint.toFloat(), -100f, 100f, 0f,
         { "%+d".format(it.roundToInt()) }, "clipInput:tint", lane = false,
         onLive = { live(ei.copy(tint = it.roundToInt())) }) { set(ei.copy(tint = it.roundToInt())) }
+    McrawRawSection17u(gs, clips, current) // Klipp Lab: a MotionCam clip's develop (EI, output), changeable any time
     if (g.ei != null && clips.size > 1) ToggleChip(stringResource(R.string.colorpage_input_all), false, {
         haptics.confirm()
         gs.setAll(clips.filter { it.id != current.id }.associate { it.id to gs.of(it.id).copy(ei = g.ei) })

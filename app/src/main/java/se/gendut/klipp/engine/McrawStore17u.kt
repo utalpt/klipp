@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 
@@ -20,26 +21,75 @@ object McrawStore17u {
     var revision by androidx.compose.runtime.mutableIntStateOf(0)
     private fun index(c: Context) = File(dir(c), "index.json")
 
-    /** The develop of [src] (named [name]) at [ei]: the same source at the same settings is the same file. */
-    fun fileFor(c: Context, src: Uri, name: String, ei: Int): File {
+    private val DEFAULT_OUT = OpenDrt.Input.SLOG3.key
+
+    /**
+     * The develop of [src] (named [name]) at [ei] into [out] (an [OpenDrt.Input] key): the same source at the same
+     * settings is the same file.
+     */
+    fun fileFor(c: Context, src: Uri, name: String, ei: Int, out: String = DEFAULT_OUT): File {
         val base = name.substringBeforeLast('.').replace(Regex("[^A-Za-z0-9_.-]"), "_").take(60)
-        val h = (src.toString() + "|ei" + ei).hashCode().toUInt().toString(16)
-        return File(dir(c), "${base}_ei${ei}_$h.mp4")
+        val key = src.toString() + "|ei" + ei + if (out != DEFAULT_OUT) "|$out" else ""
+        val h = key.hashCode().toUInt().toString(16)
+        return File(dir(c), "${base}_ei${ei}${if (out != DEFAULT_OUT) "_$out" else ""}_$h.mp4")
     }
 
     /** Develops [src] (or reuses its develop). Blocking: call off the main thread. */
-    fun develop(c: Context, src: Uri, name: String, ei: Int, progress: (Float) -> Unit): McrawConvert.Result {
-        val f = fileFor(c, src, name, ei)
-        if (f.exists() && f.length() > 0) return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "")
-        val r = McrawConvert.convert(c, src, outFile = f, ei = ei, progress = progress)
-        if (r.uri != null) { record(c, f, src, name, ei); revision++ }
+    fun develop(c: Context, src: Uri, name: String, ei: Int, out: String = DEFAULT_OUT, progress: (Float) -> Unit): McrawConvert.Result {
+        val f = fileFor(c, src, name, ei, out)
+        if (f.exists() && f.length() > 0) { record(c, f, src, name, ei, out); return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "") }
+        val r = McrawConvert.convert(c, src, outFile = f, ei = ei, out = out, progress = progress)
+        if (r.uri != null) { record(c, f, src, name, ei, out); revision++ }
         return r
     }
 
-    @Synchronized private fun record(c: Context, f: File, src: Uri, name: String, ei: Int) {
+    @Synchronized private fun record(c: Context, f: File, src: Uri, name: String, ei: Int, out: String) {
         val o = runCatching { JSONObject(index(c).readText()) }.getOrDefault(JSONObject())
-        o.put(f.name, JSONObject().put("source", src.toString()).put("name", name).put("ei", ei).put("made", System.currentTimeMillis()))
+        o.put(f.name, JSONObject().put("source", src.toString()).put("name", name).put("ei", ei).put("out", out).put("made", System.currentTimeMillis()))
         runCatching { index(c).writeText(o.toString()) }
+    }
+
+    /** What a develop was made from. */
+    data class Info(val source: Uri, val name: String, val ei: Int, val out: String)
+
+    /** The develop behind [uri] (a clip's file), or null when it is not one. Reads a small file: off the main thread. */
+    fun infoOf(c: Context, uri: Uri?): Info? {
+        if (uri == null || uri.scheme != "file") return null
+        val f = File(uri.path ?: return null)
+        if (f.parentFile?.absolutePath != dir(c).absolutePath) return null
+        val o = runCatching { JSONObject(index(c).readText()).optJSONObject(f.name) }.getOrNull() ?: return null
+        val src = o.optString("source").takeIf { it.isNotEmpty() } ?: return null
+        return Info(Uri.parse(src), o.optString("name", f.name), o.optInt("ei", 800), o.optString("out", DEFAULT_OUT))
+    }
+
+    /**
+     * Links every media item of the open project that uses [old] to [new] (set by the open project). The develop
+     * left behind is removed by [clean] once no project uses it.
+     */
+    @Volatile var relink: ((old: Uri, new: Uri) -> Unit)? = null
+
+    /** The develop running in the background for the RAW settings: "name: 42 %", null = none. */
+    var working by androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val bg = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+
+    /**
+     * Develops [info]'s source again at [ei] into [out] in the background and, when done, puts it in the place of
+     * [old] in the project; [done] (on the main thread) gets the new file, or null and the reason.
+     */
+    fun redevelop(c: Context, old: Uri, info: Info, ei: Int, out: String, done: (Uri?, String) -> Unit) {
+        if (working != null) return
+        val app = c.applicationContext
+        working = "${info.name}: 0 %"
+        bg.launch {
+            val r = runCatching { develop(app, info.source, info.name, ei, out) { p -> working = "${info.name}: ${(p * 100).toInt()} %" } }
+                .getOrElse { McrawConvert.Result(null, it.message ?: it.toString(), "") }
+            runCatching { File(app.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                working = null
+                if (r.uri != null && r.uri != old) relink?.invoke(old, r.uri)
+                done(r.uri, r.summary)
+            }
+        }
     }
 
     /** Deletes every develop (Settings → Clear). */
