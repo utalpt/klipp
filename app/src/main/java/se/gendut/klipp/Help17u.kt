@@ -1,7 +1,18 @@
 package se.gendut.klipp
 
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,15 +38,41 @@ fun Modifier.help17u(title: String, text: String): Modifier = this.pointerInput(
 /** For a control's own combinedClickable: the long click that shows the help, or null when there is none. */
 fun onLongHelp17u(title: String, text: String?): (() -> Unit)? = text?.let { t -> { Help17u.shown = title to t } }
 
+/**
+ * The help card: semi-transparent over a light dim (the screen stays readable behind it), a "?" mark, the control's
+ * name and what it does. A tap anywhere closes it.
+ */
 @Composable
 fun Help17uHost() {
     val h = Help17u.shown ?: return
-    AlertDialog(
-        onDismissRequest = { Help17u.shown = null },
-        confirmButton = { FlatTextButton({ Help17u.shown = null }) { Text("OK") } },
-        title = { Text(h.first) },
-        text = { Text(h.second) },
-    )
+    androidx.compose.ui.window.Dialog(onDismissRequest = { Help17u.shown = null }) {
+        // a lighter dim than a normal dialog's
+        val view = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.SideEffect {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.setDimAmount(0.25f)
+        }
+        val shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+        androidx.compose.foundation.layout.Column(
+            Modifier.widthIn(max = 360.dp)
+                .clip(shape)
+                .background(K.SurfaceHigh.copy(alpha = 0.88f))
+                .border(1.dp, K.OutlineVar.copy(alpha = 0.6f), shape)
+                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { Help17u.shown = null }
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+        ) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.size(28.dp).clip(androidx.compose.foundation.shape.CircleShape).background(K.PrimaryContainer),
+                    contentAlignment = androidx.compose.ui.Alignment.Center,
+                ) { Text("?", color = K.PrimarySoft, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                Text(h.first, color = K.OnSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Text(h.second, color = K.OnSurfaceVar, fontSize = 14.sp, lineHeight = 21.sp)
+            Text("Tap to close", color = K.Outline, fontSize = 11.sp, modifier = Modifier.align(androidx.compose.ui.Alignment.End))
+        }
+    }
 }
 
 /** The help texts (English for now). [of]: by a control's test tag (sliders, drop-down fields, dock actions). */
