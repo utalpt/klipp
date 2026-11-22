@@ -10,7 +10,9 @@
 ## 🧪 What Klipp Lab adds
 
 - 🌈 **HLG export from the grade:** each clip's last OpenDRT node renders Rec.2100 HLG, 10-bit HEVC, tagged
-  BT.2020 / HLG (Google Photos shows it as HDR).
+  BT.2020 / HLG (Google Photos shows it as HDR). Ungraded clips, titles and captions are converted from SDR
+  (BT.2408, SDR white at 75 % HLG), and the export dialog shows what will actually be made. *(Both sent to Klipp too:
+  in Klipp 0.21.0-beta.2.)*
 - 🎥 **Dolby Vision export from the grade:** the same HLG encoded by the phone's Dolby Vision encoder as Profile 8.4
   (HLG compatible), the dynamic metadata made from the edited frames.
 - 🔁 **Dolby Vision in, Dolby Vision out:** Dolby Vision clips cut and edited come out as Dolby Vision 8.4 again
@@ -20,15 +22,26 @@
 - 🎚️ **EI per clip:** the EI a log clip was shot at and the EI it is rated at, applied before all nodes, LUTs and
   OpenDRT; for the 17 Ultra mods also where the sensor clips (the 0.0072 × EI relation from George Kiarie's
   RawViewer).
+- 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
+  linear light before all nodes, as in a raw developer – live while dragging.
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
 - 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
+- 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
+  the system again before sending you to the settings. *(Sent to Klipp too: in Klipp 0.21.0-beta.2.)*
 - ➕ **Add to the timeline** in the order selected, or straight on import.
 - ⏱️ **Frame rates:** phone clips give a standard project rate (a 60 fps clip measured at 58.6 makes a 60 fps
   project), and the rate chosen for a new project is kept.
 - 🎨 Files without a colour transfer keep their matrix and range.
 - ✅ Select several projects and delete them at once.
 - 🔲 The selection box scrolls the timeline at the edges.
+- 🧲 **Close gaps:** hold a track's header → Close gaps, or Close gap beside Delete for a selected clip – the clip
+  moves back to the one before it, linked clips follow.
+- 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – proxies, node cache, renders,
+  each with its Clear, plus Clear caches – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off);
+  opening a project then says what each kind takes.
+- 🎓 **Grading for beginners** (Settings): the fundamental steps from log footage to a finished image.
+- ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
   size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
   landscape, drag the grip between the picture and the timeline (double tap to reset).
