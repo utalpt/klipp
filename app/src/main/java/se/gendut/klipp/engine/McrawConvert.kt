@@ -42,7 +42,11 @@ object McrawConvert {
      * [draft]: half size, each 2×2 CFA block one pixel (no demosaic) – a quick develop for playback; the full one is
      * made for the export.
      */
-    fun convert(ctx: Context, src: Uri, draft: Boolean = false, progress: (Float) -> Unit): Result {
+    /**
+     * [outFile]: the clip goes there (the app's own storage, see McrawStore17u) instead of Movies/Klipp Lab. [ei]: the
+     * EI to develop at (else the picker's setting).
+     */
+    fun convert(ctx: Context, src: Uri, draft: Boolean = false, outFile: java.io.File? = null, ei: Int? = null, progress: (Float) -> Unit): Result {
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
         if (!Mcraw.available) return Result(null, "MCRAW library not loaded", "")
@@ -78,23 +82,30 @@ object McrawConvert {
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
 
-            val ei = se.gendut.klipp.McrawFolder17u.ei(ctx)
+            val ei = ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)
             line("developed at EI $ei (sensor clip ${"%.1f".format(headroom(ei))} stops over 18 % grey)")
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff)
             line("cfa $cfa  camera → S-Gamut3.Cine: ${camToOut.joinToString { "%.4f".format(it) }}")
 
-            // output file in Movies/Klipp Lab
+            // output file: the given one (written as .part, renamed when done), else in Movies/Klipp Lab
             val base = name.substringBeforeLast('.')
+            val part = outFile?.let { java.io.File(it.path + ".part") }
+            if (part != null) {
+                part.parentFile?.mkdirs()
+                outUri = Uri.fromFile(outFile)
+            }
             val values = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, "${base}_SLog3${if (draft) "_draft" else ""}.mp4")
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                 put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Klipp Lab")
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             }
-            outUri = ctx.contentResolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
+            if (part == null) outUri = ctx.contentResolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
                 ?: return Result(null, "Could not create the output file", log.toString())
-            val outPfd = ctx.contentResolver.openFileDescriptor(outUri, "rw") ?: return Result(null, "Could not open the output file", log.toString())
+            val outPfd = (if (part != null) android.os.ParcelFileDescriptor.open(part, android.os.ParcelFileDescriptor.MODE_CREATE or
+                android.os.ParcelFileDescriptor.MODE_TRUNCATE or android.os.ParcelFileDescriptor.MODE_READ_WRITE)
+                else ctx.contentResolver.openFileDescriptor(outUri!!, "rw")) ?: return Result(null, "Could not open the output file", log.toString())
 
             val tStart = System.nanoTime()
             // the sound: AAC, encoded first (it is small), written once the muxer starts
@@ -195,15 +206,17 @@ object McrawConvert {
                 outPfd.close()
             }
             val secs = (System.nanoTime() - tStart) / 1e9
-            ctx.contentResolver.update(outUri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)
+            if (part != null) { if (!part.renameTo(outFile!!)) error("could not write ${outFile.name}") }
+            else ctx.contentResolver.update(outUri!!, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
-                "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4 – ${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
+                (outFile?.name ?: "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4") + " – " + "${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input Sony S-Log3 / S-Gamut3.Cine (the default), developed at EI $ei."
             return Result(outUri, summary, log.toString())
         } catch (e: Throwable) {
             line("error: $e")
-            outUri?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
+            if (outFile != null) runCatching { java.io.File(outFile.path + ".part").delete() }
+            else outUri?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             return Result(null, "Conversion failed: ${e.message}", log.toString())
         } finally {
             Mcraw.close(h); pfd.close()

@@ -1124,6 +1124,11 @@ class ProjectController(
         }
         }
         projectsRevision++
+        // Klipp Lab: develops no project uses any more go; and a word when the app's files pass the user's limit
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { McrawStore17u.clean(context, projectDir) }
+            runCatching { StorageWarn17u.check(context) }.getOrNull()
+        }?.let { onMessage(it) }
     }
 
     fun renameProject(id: String, name: String) = scope.launch {
@@ -1177,6 +1182,8 @@ class ProjectController(
                 val used = projectDir.listFiles { f -> f.name.endsWith(".media.json") }.orEmpty().any { runCatching { it.readText().contains(path) }.getOrDefault(true) }
                 if (!used) dir.deleteRecursively()
             }
+            // Klipp Lab: the MotionCam develops only this project used
+            runCatching { McrawStore17u.clean(context, projectDir) }
         }
         projectsRevision++
     }

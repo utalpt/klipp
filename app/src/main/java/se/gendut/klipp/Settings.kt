@@ -279,6 +279,8 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                 }
                 3 -> PanelCard(Modifier.padding(top = 8.dp)) {
             StorageSummary(ctx)
+            // Klipp Lab: MotionCam develops, and the size above which opening a project warns
+            Storage17uRows(ctx)
             ProxySection(ctx)
             var cacheSize by remember { mutableStateOf(0L) }
             androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.NodeCache.revision) {

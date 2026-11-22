@@ -114,3 +114,36 @@ fun McrawProbeRow(ctx: Context) {
         )
     }
 }
+
+/** Klipp Lab: Settings → Playback, under the storage summary: the MotionCam develops and the warning limit. */
+@Composable
+fun Storage17uRows(ctx: Context) {
+    val scope = rememberCoroutineScope()
+    var mcraw by remember { mutableStateOf(0L) }
+    var rev by remember { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(rev) { mcraw = withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.bytes(ctx) } }
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("MotionCam RAW develops", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("%.1f GB · made when a .mcraw is imported; removed on their own when no project uses them. Clear: they are made again only by importing the .mcraw again.".format(mcraw / 1e9),
+                color = K.OnSurfaceVar, fontSize = 12.sp)
+        }
+        FlatTextButton(onClick = {
+            scope.launch {
+                withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.dir(ctx).listFiles()?.forEach { it.delete() } }
+                rev++
+            }
+        }, modifier = Modifier.testTag("set:clearMcraw")) { Text("Clear") }
+    }
+    var lim by remember { mutableStateOf(se.gendut.klipp.engine.StorageWarn17u.limitGb(ctx)) }
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Text("Warn when Klipp Lab uses more than", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text("Checked when a project is opened (proxies, cache, renders, MCRAW, freeze frames).", color = K.OnSurfaceVar, fontSize = 12.sp)
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+            items(se.gendut.klipp.engine.StorageWarn17u.LIMITS_GB.size) { i ->
+                val v = se.gendut.klipp.engine.StorageWarn17u.LIMITS_GB[i]
+                ToggleChip(if (v == 0) "Off" else "$v GB", lim == v, { lim = v; se.gendut.klipp.engine.StorageWarn17u.setLimitGb(ctx, v) }, Modifier.testTag("set:warnGb$v"))
+            }
+        }
+    }
+}
