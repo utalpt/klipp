@@ -26,6 +26,8 @@ import kotlin.math.roundToInt
  * @param bitDepth bit depth of an SDR file: 0 = same as the sources (10 if any clip is 10-bit), 8 or 10 (HEVC/AV1 Main10)
  * @param hlg HDR made from the grade: every graded clip ends in OpenDRT, rendered as Rec.2100 HLG (10-bit HEVC) –
  *   see [ClipGrade.hlgReady]
+ * @param dolby Klipp Lab: the HLG made from the grade encoded as Dolby Vision profile 8.4 (HLG base, its dynamic metadata
+ *   made by the phone's Dolby Vision encoder from the exported frames, as in Dolby's dolby-vision-editor sample)
  */
 data class ExportSettings(
     val height: Int = 0,
@@ -42,10 +44,11 @@ data class ExportSettings(
     val mono: Boolean = false,
     val bitDepth: Int = 0,
     val hlg: Boolean = false,
+    val dolby: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().put("h", height).put("fps", fps).put("codec", codec).put("mbps", bitrateMbps.toDouble())
         .put("cbr", cbr).put("key", keyframeSec.toDouble()).put("high", highProfile).put("hdr", hdr)
-        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg)
+        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg).put("dv", dolby)
 
     /** Output frame size for a [w]×[h] project (even dimensions, as encoders require). */
     fun outputSize(w: Int, h: Int): Pair<Int, Int> {
@@ -90,6 +93,7 @@ data class ExportSettings(
                 o.optInt("sr", 0).coerceIn(0, 192_000), o.optBoolean("mono", false),
                 o.optInt("bits", 0).let { if (it == 8 || it == 10) it else 0 },
                 o.optBoolean("hlg", false),
+                o.optBoolean("dv", false),
             )
         }
 
@@ -153,6 +157,14 @@ object EncoderCaps {
     fun sizeSupported(mime: String, w: Int, h: Int): Boolean = runCatching {
         EncoderUtil.getSupportedEncoders(mime).any { EncoderUtil.isSizeSupported(it, mime, w, h) }
     }.getOrDefault(false)
+
+    /** Klipp Lab: can the phone encode Dolby Vision 8.4 (an HLG base) – an encoder for video/dolby-vision with HLG? */
+    val dolbyVisionSupported: Boolean by lazy {
+        runCatching {
+            val ci = ColorInfo.Builder().setColorSpace(C.COLOR_SPACE_BT2020).setColorRange(C.COLOR_RANGE_LIMITED).setColorTransfer(C.COLOR_TRANSFER_HLG).build()
+            EncoderUtil.getSupportedEncodersForHdrEditing(MimeTypes.VIDEO_DOLBY_VISION, ci).isNotEmpty()
+        }.getOrDefault(false)
+    }
 
     /** Can the phone encode HDR (HLG or PQ, 10-bit) with HEVC? */
     val hdrSupported: Boolean by lazy {

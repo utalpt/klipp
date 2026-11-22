@@ -181,9 +181,13 @@ fun ExportOptions(
     Chips {
         Choice("SDR · Rec.709", !s.hdr && !s.hlg, true, "exp:sdr") { onChange(s.copy(hdr = false, hlg = false)) }
         Choice(stringResource(R.string.exportui_hdr_keep), s.hdr, hdrPossible && hdrBlocked == null, "exp:hdr") { onChange(s.copy(hdr = true, hlg = false, codec = MimeTypes.VIDEO_H265)) }
-        Choice("HLG · OpenDRT", s.hlg, hlgReady && se.gendut.klipp.engine.EncoderCaps.hdrSupported, "exp:hlg") { onChange(s.copy(hdr = false, hlg = true, codec = MimeTypes.VIDEO_H265)) }
+        Choice("HLG · OpenDRT", s.hlg && !s.dolby, hlgReady && se.gendut.klipp.engine.EncoderCaps.hdrSupported, "exp:hlg") { onChange(s.copy(hdr = false, hlg = true, dolby = false, codec = MimeTypes.VIDEO_H265)) }
+        // Klipp Lab: the same HLG as Dolby Vision 8.4, on phones with a Dolby Vision encoder
+        if (se.gendut.klipp.engine.EncoderCaps.dolbyVisionSupported)
+            Choice("Dolby Vision · OpenDRT", s.hlg && s.dolby, hlgReady, "exp:dv") { onChange(s.copy(hdr = false, hlg = true, dolby = true, codec = MimeTypes.VIDEO_H265)) }
     }
     Note(when {
+        s.hlg && s.dolby -> "Dolby Vision 8.4: the HLG (Rec.2100, 1000 nits) of each clip's last OpenDRT node, encoded by the phone's Dolby Vision encoder, which makes the dynamic metadata from the exported frames. Plays as HLG where there is no Dolby Vision. The preview stays SDR."
         s.hlg -> "HLG (Rec.2100, 1000 nits) rendered by each clip's last OpenDRT node; 10-bit HEVC. The preview stays SDR."
         s.hdr -> stringResource(R.string.exportui_note_hdr)
         hdrBlocked != null -> hdrBlocked
@@ -251,7 +255,7 @@ fun ExportDialog(
                 }
                 Text(
                     "${ow}×$oh · ${stringResource(R.string.exportui_fps_value, fpsLabel(plan.fps))} · ${codecName(plan.effective.codec)}" +
-                        (if (plan.hlg) " HLG" else if (plan.hdr) " HDR" else if (plan.tenBit) " 10-bit" else "") + " · " +
+                        (if (plan.hlg && plan.effective.dolby) "" else if (plan.hlg) " HLG" else if (plan.hdr) " HDR" else if (plan.tenBit) " 10-bit" else "") + " · " +
                         (if (s.bitrateMbps > 0f) mbpsLabel(s.bitrateMbps.toDouble()) else stringResource(R.string.exportui_auto_lower)) + " · ≈ ${sizeLabel(mb)}",
                     color = K.OnSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).testTag("exp:summary"),
@@ -275,6 +279,7 @@ fun ExportDialog(
 fun codecName(mime: String): String = EncoderCaps.codecs.firstOrNull { it.mime == mime }?.label?.substringBefore(" ·") ?: when (mime) {
     MimeTypes.VIDEO_H265 -> "HEVC"
     MimeTypes.VIDEO_AV1 -> "AV1"
+    MimeTypes.VIDEO_DOLBY_VISION -> "Dolby Vision 8.4"
     else -> "H.264"
 }
 
@@ -292,6 +297,7 @@ fun exportIssueText(i: se.gendut.klipp.engine.ExportPlan.Issue, plan: se.gendut.
         se.gendut.klipp.engine.ExportPlan.Kind.TEN_BIT_NONE -> Str.t(R.string.exportplan_ten_none)
         se.gendut.klipp.engine.ExportPlan.Kind.HDR_TO_SDR -> Str.t(R.string.exportplan_hdr_sdr)
         se.gendut.klipp.engine.ExportPlan.Kind.HDR_GRADED -> Str.t(R.string.app_hdr_blocked)
+        se.gendut.klipp.engine.ExportPlan.Kind.DV_NONE -> "This phone has no Dolby Vision encoder – exporting HLG."
         se.gendut.klipp.engine.ExportPlan.Kind.HLG_NOT_READY -> "HLG needs every graded clip to end in an OpenDRT node (whole image, full mix, no film after it) and an HDR encoder – exporting SDR."
     }
 }

@@ -18,6 +18,8 @@ interface EncoderInfo {
     fun tenBit(mime: String): Support
     /** HDR (HLG/PQ, 10-bit HEVC). */
     val hdr: Support
+    /** Klipp Lab: Dolby Vision 8.4 (HLG base). */
+    val dolbyVision: Support get() = Support.NO
 }
 
 /** The real encoders. A phone that reports no encoder at all for a codec can't tell – every phone has some. */
@@ -49,6 +51,8 @@ object PhoneEncoders : EncoderInfo {
     }
 
     override val hdr: Support get() = if (EncoderCaps.hdrSupported) Support.YES else Support.NO
+
+    override val dolbyVision: Support get() = if (EncoderCaps.dolbyVisionSupported) Support.YES else Support.NO
 }
 
 /**
@@ -99,6 +103,8 @@ data class ExportPlan(
         HDR_GRADED,
         /** HLG from OpenDRT wanted, but not every graded clip ends in OpenDRT (or the phone can't encode HDR): SDR. */
         HLG_NOT_READY,
+        /** Klipp Lab: Dolby Vision wanted, the phone has no Dolby Vision encoder: HLG (HEVC). */
+        DV_NONE,
     }
 
     companion object {
@@ -121,7 +127,10 @@ data class ExportPlan(
             // HLG from the grades' OpenDRT: HEVC Main10, BT.2020 / HLG
             if (s.hlg) {
                 if (hlgReady && caps.hdr != Support.NO) {
-                    val st = s.copy(hdr = false, codec = MimeTypes.VIDEO_H265, bitDepth = 10)
+                    // Klipp Lab: Dolby Vision 8.4 = the same HLG, encoded by the Dolby Vision encoder
+                    val dv = s.dolby && caps.dolbyVision == Support.YES
+                    if (s.dolby && !dv) warnings += Issue(Kind.DV_NONE)
+                    val st = s.copy(hdr = false, dolby = dv, codec = if (dv) MimeTypes.VIDEO_DOLBY_VISION else MimeTypes.VIDEO_H265, bitDepth = 10)
                     if (caps.size(st.codec, w, h) == Support.NO) errors += Issue(Kind.SIZE_NONE, st.codec)
                     return ExportPlan(st, w, h, fps, tenBit = true, hdr = false, errors, warnings, hlg = true)
                 }

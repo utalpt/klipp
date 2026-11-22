@@ -19,6 +19,12 @@ Color and export
 - LUT import: several .cube files and .zip packs at once; a zip's folders become groups. Hold a LUT to select
   several (tap a group's name for the whole group) and delete them.
 
+- Export → Dolby Vision · OpenDRT (on phones with a Dolby Vision encoder, e.g. the 17 Ultra's c2.qti.dv.encoder):
+  the same HLG as "HLG · OpenDRT", encoded as Dolby Vision profile 8.4. The encoder makes the dynamic metadata from
+  the exported frames, so edited and mixed clips get metadata that matches what is in the file; plays as HLG where
+  there is no Dolby Vision. The approach follows Dolby's dolby-vision-editor sample (BSD-3-Clause-Clear); the
+  encoding itself is Media3's.
+
 Import and timeline
 - Klipp Lab's own video picker: the phone's videos newest first, by folder, with previews of 10-bit log video (the
   system pickers show none), real file names, duration, resolution and date; hidden and ".pending" files left out.
@@ -30,7 +36,7 @@ Import and timeline
 - Media panel: with clips selected, "Add N to the timeline, in this order", each selected card numbered.
 - Timeline selection box (hold on an empty area and drag): near the left or right edge the timeline scrolls on its
   own, so the box reaches clips off screen.
-- Speed → Conform (e.g. "Conform 120→24"): for a clip shot at a higher frame rate than the project's, sets the
+- Speed → Slow-mo (e.g. "Slow-mo 120→24", a conform): for a clip shot at a higher frame rate than the project's, sets the
   speed so every source frame is used once (120 → 24 fps = 20 %, 5× slower), no frame repeated or dropped. "≈" when
   the rates don't divide into a whole percent (120 → 25). Idea from George Kiarie's RawViewer.
 

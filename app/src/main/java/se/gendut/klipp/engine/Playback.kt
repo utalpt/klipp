@@ -1576,6 +1576,9 @@ object Exporter {
                     .setVideoMimeType(st.codec)
                     .setAudioMimeType(MimeTypes.AUDIO_AAC)
                     .setEncoderFactory(encoderFactory(context, st, tenBit).let { if (st.hlg) HlgEncoders(it) else if (oneColor) OneColorEncoders(it) else it })
+                    // Klipp Lab: Dolby Vision through Android's muxer, which writes the Dolby Vision profile and level
+                    // (dvcC) into the MP4 (Media3's FrameworkMuxer does that from API 33)
+                    .apply { if (st.codec == MimeTypes.VIDEO_DOLBY_VISION) setMuxerFactory(androidx.media3.transformer.FrameworkMuxer.Factory()) }
                     // floating point in the whole chain; with 10-bit an RGBA_1010102 surface into the encoder
                     .setVideoFrameProcessorFactory(VideoPipeline.processorFactory(tenBit))
                     .addListener(object : Transformer.Listener {
