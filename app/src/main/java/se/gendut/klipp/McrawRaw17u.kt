@@ -96,3 +96,28 @@ private fun followDevelop(g: se.gendut.klipp.engine.ClipGrade, ei: Int, out: Str
         nodes = g.nodes.map { n -> n.drt?.let { d -> n.copy(drt = d.copy(input = out)) } ?: n },
     )
 }
+
+/**
+ * Klipp Lab: HLG from MotionCam clips without setting up OpenDRT by hand. The grades the timeline's MotionCam clips
+ * ([clips]: clip id → its file) need for an HLG export: each such clip whose grade doesn't end in OpenDRT gets it – on
+ * its last node when that node does nothing yet, else as a node of its own after the others – with the develop's
+ * curve and gamut as its input. A clip whose last OpenDRT node can't make HLG (a film, a window, a mix under 100 %) is
+ * left to the user. Empty = nothing to add. Reads the develops' index: small, but off the main thread when it can be.
+ */
+fun mcrawHlgGrades17u(ctx: android.content.Context, clips: List<Pair<Long, android.net.Uri?>>, gs: GradeState): Map<Long, se.gendut.klipp.engine.ClipGrade> {
+    val out = LinkedHashMap<Long, se.gendut.klipp.engine.ClipGrade>()
+    for ((id, uri) in clips) {
+        val info = McrawStore17u.infoOf(ctx, uri) ?: continue
+        val g = gs.of(id)
+        if (g.hlgReady) continue
+        val last = g.chain.lastOrNull { !it.isNeutral }
+        if (last?.drt != null) continue
+        val drt = se.gendut.klipp.engine.Drt(input = info.out)
+        val tail = g.nodes.lastOrNull()
+        val nodes = if (tail != null && tail.isNeutral && tail.drt == null && tail.enabled && tail.mix >= 0.999f) g.nodes.dropLast(1) + tail.copy(drt = drt)
+        else g.nodes + se.gendut.klipp.engine.GradeNode((g.nodes.maxOfOrNull { it.id } ?: 0) + 1, "OpenDRT", drt = drt)
+        val e = g.ei ?: se.gendut.klipp.engine.InputEi()
+        out[id] = g.copy(nodes = nodes, ei = if (e.input != info.out) e.copy(input = info.out) else g.ei)
+    }
+    return out
+}

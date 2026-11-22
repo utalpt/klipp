@@ -354,6 +354,11 @@ private fun KlippAppContent(
         val c = controller ?: return
         se.gendut.klipp.engine.ExportSettings.save(context, c.currentId, settings)
         lastExportAsk = settings to name
+        // Klipp Lab: HLG with MotionCam clips – the OpenDRT they need goes into their grades (one undo step, seen in Color)
+        if (settings.hlg) {
+            val fix = mcrawHlgGrades17u(context, c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to c.uriOf(it.item) } }, gs)
+            if (fix.isNotEmpty()) gs.setAll(fix)
+        }
         // color-graded clips always become SDR (grading is done in SDR) – except HLG made from the grades' OpenDRT
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
         val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.values, lookOf(grade))) it.copy(hlg = false) else it }
@@ -424,6 +429,10 @@ private fun KlippAppContent(
     if (exportAsk && controller != null) {
         val q = controller.snapshot.sequence
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
+        val gradesForHlg17u = remember(controller.revision, gs.revision) {
+            val fix = mcrawHlgGrades17u(context, q?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to controller.uriOf(it.item) } }, gs)
+            (gs.grades + fix).values
+        }
         val anyHdr = remember(controller.revision) { se.gendut.klipp.engine.CompositionBuilder.anyHdr(context, controller.snapshot) { controller.uriOf(it) } }
         // 10-bit sources (Auto bit depth follows them) – read from the files, off the main thread
         val anyTen by androidx.compose.runtime.produceState<Boolean?>(null, controller.revision) {
@@ -439,8 +448,9 @@ private fun KlippAppContent(
             // grading is done in SDR (8 bits, gamma) – in an HDR signal it would look wrong
             hdrBlocked = if (graded) stringResource(R.string.app_hdr_blocked) else null,
             anyTenBit = anyTen,
-            hlgReady = hlgReadyOf(gs.grades.values, lookOf(grade)),
-            hlgWhyNot = hlgWhyNot(gs.grades.values, lookOf(grade)),
+            // Klipp Lab: MotionCam clips count as ready – choosing HLG gives them OpenDRT (see runExport)
+            hlgReady = hlgReadyOf(gradesForHlg17u, lookOf(grade)),
+            hlgWhyNot = hlgWhyNot(gradesForHlg17u, lookOf(grade)),
             onDismiss = { exportAsk = false },
         ) { st, name -> exportAsk = false; runExport(st, name) }
     }

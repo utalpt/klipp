@@ -70,6 +70,10 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MCRAW → HLG without setting up OpenDRT: with MotionCam clips on the timeline, HLG · OpenDRT (and Dolby Vision ·
+  OpenDRT) can be chosen in the export even when they have no OpenDRT yet; exporting adds it to their grades (on
+  the last node when it does nothing yet, else a node of its own), with the develop's curve as its input – one undo
+  step, and the Color page then shows it.
 - MCRAW white balance in the develop: on a MotionCam clip, Develop puts the white balance set live in the clip's input
   into the develop – as camera gains on the raw, before the demosaic and the neutral highlight clip, so clipped
   highlights stay white – and the live one goes back to As shot. Kept through later develops (EI, output).
