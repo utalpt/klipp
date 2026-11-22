@@ -884,12 +884,12 @@ private fun KlippAppContent(
         // height set by hand is kept per shape – one height for every project left a 16:9 picture in a square box after
         // a portrait project
         // (derived: an edit changes the snapshot, the shape seldom – the editor doesn't recompose on every edit for it)
-        val shape by remember(controller) { derivedStateOf {
+        val picShape by remember(controller) { derivedStateOf {
             val q = controller?.snapshot?.sequence
             if (q != null && q.width > 0 && q.height > 0) q.width.toFloat() / q.height else 16f / 9f
         } }
-        val shapeKey = "%.3f".format(java.util.Locale.ROOT, shape)
-        val defaultMonitorH = maxWidth / shape
+        val shapeKey = "%.3f".format(java.util.Locale.ROOT, picShape)
+        val defaultMonitorH = maxWidth / picShape
         val maxMonitorH = maxHeight * 0.55f
         var monitorH by remember(shapeKey) { mutableStateOf(AppPrefs.monitorHeightFor(context, shapeKey).takeIf { it > 0f }?.dp ?: defaultMonitorH) }
         // the picture's scrub speed while it is dragged (shown as a badge on the picture)
