@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -431,7 +432,7 @@ internal fun ToolRail(tabs: List<ToolTab>, selected: Int, onSelect: (Int) -> Uni
                 val name by animateColorAsState(if (on && dense) K.OnSurface else if (on) K.PrimarySoft else K.OnSurfaceVar, label = "rn")
                 Column(
                     Modifier.width(76.dp).height(each).inViewWhen(on, each / 2, horizontal = false)
-                        .androidx.compose.foundation.combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab,
+                        .combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab,
                             onLongClick = onLongHelp17u(t.label, Help17uText.of(t.tag))) { if (!on) haptics.tick(); onSelect(i) }
                         .semantics { this.selected = on }
                         .testTag(t.tag),

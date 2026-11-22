@@ -558,7 +558,7 @@ private fun NodeRow(
                 Box(
                     Modifier.pressPop(eiSrc, 0.92f).height(44.dp).clip(RoundedCornerShape(14.dp))
                         .background(if (ei?.active == true) K.PrimaryContainer.copy(alpha = 0.5f) else K.SurfaceHigh)
-                        .androidx.compose.foundation.combinedClickable(interactionSource = eiSrc, indication = null, role = Role.Button,
+                        .combinedClickable(interactionSource = eiSrc, indication = null, role = Role.Button,
                             onLongClick = onLongHelp17u(eiText, Help17uText.of("clipInput")), onClick = onInput)
                         .padding(horizontal = 12.dp).testTag("clipInput"),
                     contentAlignment = Alignment.Center,
@@ -574,7 +574,7 @@ private fun NodeRow(
                 val src = remember { MutableInteractionSource() }
                 Box(
                     Modifier.pressPop(src, 0.88f).size(44.dp).clip(RoundedCornerShape(14.dp)).border(1.5.dp, K.Outline, RoundedCornerShape(14.dp))
-                        .androidx.compose.foundation.combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+                        .combinedClickable(interactionSource = src, indication = null, role = Role.Button,
                             onLongClick = onLongHelp17u(stringResource(R.string.colorpage_new_node), Help17uText.of("addNode")), onClick = onAdd).testTag("addNode"),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Ic.Plus, stringResource(R.string.colorpage_new_node), tint = K.OnSurface, modifier = Modifier.size(18.dp)) }
@@ -989,7 +989,7 @@ private fun ViewerChip(label: String, icon: ImageVector, on: Boolean, tag: Strin
     val bg by animateColorAsState(if (on) K.PrimaryContainer else Color(0xB20F1012), label = "vc")
     val fg = if (on) K.PrimarySoft else Color.White
     Box(
-        Modifier.pressPop(src, 0.9f).height(44.dp).androidx.compose.foundation.combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+        Modifier.pressPop(src, 0.9f).height(44.dp).combinedClickable(interactionSource = src, indication = null, role = Role.Button,
             onLongClick = onLongHelp17u(label, Help17uText.of(tag)), onClick = onClick).testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
@@ -1051,7 +1051,7 @@ private fun WheelsPanel(
             val src = remember { MutableInteractionSource() }
             Box(
                 Modifier.pressPop(src, 0.88f).size(44.dp).clip(RoundedCornerShape(14.dp))
-                    .androidx.compose.foundation.combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+                    .combinedClickable(interactionSource = src, indication = null, role = Role.Button,
                         onLongClick = onLongHelp17u(stringResource(R.string.design_color_reset_wheels), Help17uText.of("wheels:reset"))) {
                         // all of this mode's wheels in one step
                         val reset = if (!log) n.copy(lift = Wheel(), gamma = Wheel(), gain = Wheel(), offset = Wheel())
@@ -1099,7 +1099,7 @@ private fun WheelMode(label: String, on: Boolean, first: Boolean, tag: String, o
     val shape = if (first) RoundedCornerShape(22.dp, inner, inner, 22.dp) else RoundedCornerShape(inner, 22.dp, 22.dp, inner)
     Box(
         Modifier.height(44.dp).clip(shape).background(bg)
-            .androidx.compose.foundation.combinedClickable(role = Role.Tab, onLongClick = onLongHelp17u(label, Help17uText.of(tag)), onClick = onClick).semantics { selected = on }
+            .combinedClickable(role = Role.Tab, onLongClick = onLongHelp17u(label, Help17uText.of(tag)), onClick = onClick).semantics { selected = on }
             .padding(horizontal = if (on) 18.dp else 16.dp).testTag(tag),
         contentAlignment = Alignment.Center,
     ) { Text(label, color = if (on) K.Bg else K.OnSurface, fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1) }
@@ -1116,7 +1116,7 @@ private fun RangeButton(label: String, w: Wheel, on: Boolean, modifier: Modifier
     val ring = if (on) K.Primary else K.Outline
     Row(
         modifier.fillMaxWidth().pressPop(src, 0.94f).clip(RoundedCornerShape(r)).background(bg)
-            .androidx.compose.foundation.combinedClickable(interactionSource = src, indication = null, role = Role.Tab, onLongClick = onLongHelp17u(label, help), onClick = onClick).semantics { selected = on }
+            .combinedClickable(interactionSource = src, indication = null, role = Role.Tab, onLongClick = onLongHelp17u(label, help), onClick = onClick).semantics { selected = on }
             .padding(horizontal = if (on) 8.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1143,7 +1143,7 @@ private fun FlatButton(label: String, icon: ImageVector, on: Boolean, modifier: 
     val fg = if (on) K.PrimarySoft else K.OnSurface
     Row(
         modifier.pressPop(src, 0.94f).height(44.dp).clip(RoundedCornerShape(14.dp)).background(bg)
-            .androidx.compose.foundation.combinedClickable(interactionSource = src, indication = null, role = Role.Button, onLongClick = onLongHelp17u(label, help), onClick = onClick).padding(horizontal = 8.dp),
+            .combinedClickable(interactionSource = src, indication = null, role = Role.Button, onLongClick = onLongHelp17u(label, help), onClick = onClick).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp))
