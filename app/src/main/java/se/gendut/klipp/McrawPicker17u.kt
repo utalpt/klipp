@@ -62,9 +62,12 @@ object McrawFolder17u {
     fun tree(c: Context): Uri? = p(c).getString("tree", null)?.let(Uri::parse)
     fun setTree(c: Context, u: Uri) { p(c).edit().putString("tree", u.toString()).apply() }
     /** The EI the files are developed at (the sensor's clip log2(EI/25) stops over 18 % grey). */
-    fun ei(c: Context): Int = p(c).getInt("ei", 800)
-    fun setEi(c: Context, ei: Int) { p(c).edit().putInt("ei", ei).apply() }
-    val EIS = listOf(400, 800, 1600, 3200)
+    /** 0 = Auto (measured per file, see McrawConvert.autoEi). */
+    fun ei(c: Context): Int = p(c).getInt("ei2", 0)
+    fun setEi(c: Context, ei: Int) { p(c).edit().putInt("ei2", ei).apply() }
+    /** The chips: 0 = Auto. */
+    val EIS = listOf(0, 400, 800, 1600, 3200)
+    fun eiLabel(v: Int) = if (v <= 0) "Auto" else "$v"
     /** The output the files are developed into (an OpenDrt.Input key; S-Log3 / S-Gamut3.Cine by default). */
     fun out(c: Context): String = p(c).getString("out", null) ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key
     fun setOut(c: Context, k: String) { p(c).edit().putString("out", k).apply() }
@@ -104,14 +107,14 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
     }
     val startAt = remember { Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FMotionCam") }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
+        Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, modifier = Modifier.help17u("Develop at EI", Help17uText.EI).padding(end = 8.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(McrawFolder17u.EIS) { v -> ToggleChip("$v", ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.testTag("mcraw:ei$v")) }
+            items(McrawFolder17u.EIS) { v -> ToggleChip(McrawFolder17u.eiLabel(v), ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.help17u("Develop at EI", Help17uText.EI).testTag("mcraw:ei$v")) }
         }
     }
     var outKey by remember { mutableStateOf(McrawFolder17u.out(ctx)) }
     val outs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
-    DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out") { outKey = it; McrawFolder17u.setOut(ctx, it) }
+    DropField("Develop into", outs.map { Opt(it.key, it.label, key = it.key) }, outKey, "mcraw:out", Modifier.help17u("Develop into", Help17uText.OUT)) { outKey = it; McrawFolder17u.setOut(ctx, it) }
     if (tree == null) {
         Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Pick MotionCam's folder once (usually Documents/MotionCam): its .mcraw files show here, developed to S-Log3 when imported.",

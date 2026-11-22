@@ -35,22 +35,25 @@ object McrawStore17u {
     }
 
     /** Develops [src] (or reuses its develop). Blocking: call off the main thread. */
-    fun develop(c: Context, src: Uri, name: String, ei: Int, out: String = DEFAULT_OUT, progress: (Float) -> Unit): McrawConvert.Result {
+    /** [ei0] ≤ 0: Auto ([McrawConvert.autoEi], 800 when the file can't be measured). */
+    fun develop(c: Context, src: Uri, name: String, ei0: Int, out: String = DEFAULT_OUT, progress: (Float) -> Unit): McrawConvert.Result {
+        val auto = ei0 <= 0
+        val ei = if (auto) McrawConvert.autoEi(c, src) ?: 800 else ei0
         val f = fileFor(c, src, name, ei, out)
-        if (f.exists() && f.length() > 0) { record(c, f, src, name, ei, out); return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "") }
+        if (f.exists() && f.length() > 0) { record(c, f, src, name, ei, out, auto); return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "") }
         val r = McrawConvert.convert(c, src, outFile = f, ei = ei, out = out, progress = progress)
-        if (r.uri != null) { record(c, f, src, name, ei, out); revision++ }
+        if (r.uri != null) { record(c, f, src, name, ei, out, auto); revision++ }
         return r
     }
 
-    @Synchronized private fun record(c: Context, f: File, src: Uri, name: String, ei: Int, out: String) {
+    @Synchronized private fun record(c: Context, f: File, src: Uri, name: String, ei: Int, out: String, auto: Boolean) {
         val o = runCatching { JSONObject(index(c).readText()) }.getOrDefault(JSONObject())
-        o.put(f.name, JSONObject().put("source", src.toString()).put("name", name).put("ei", ei).put("out", out).put("made", System.currentTimeMillis()))
+        o.put(f.name, JSONObject().put("source", src.toString()).put("name", name).put("ei", ei).put("auto", auto).put("out", out).put("made", System.currentTimeMillis()))
         runCatching { index(c).writeText(o.toString()) }
     }
 
     /** What a develop was made from. */
-    data class Info(val source: Uri, val name: String, val ei: Int, val out: String)
+    data class Info(val source: Uri, val name: String, val ei: Int, val out: String, val auto: Boolean = false)
 
     /** The develop behind [uri] (a clip's file), or null when it is not one. Reads a small file: off the main thread. */
     fun infoOf(c: Context, uri: Uri?): Info? {
@@ -59,7 +62,7 @@ object McrawStore17u {
         if (f.parentFile?.absolutePath != dir(c).absolutePath) return null
         val o = runCatching { JSONObject(index(c).readText()).optJSONObject(f.name) }.getOrNull() ?: return null
         val src = o.optString("source").takeIf { it.isNotEmpty() } ?: return null
-        return Info(Uri.parse(src), o.optString("name", f.name), o.optInt("ei", 800), o.optString("out", DEFAULT_OUT))
+        return Info(Uri.parse(src), o.optString("name", f.name), o.optInt("ei", 800), o.optString("out", DEFAULT_OUT), o.optBoolean("auto", false))
     }
 
     /**

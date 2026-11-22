@@ -40,21 +40,22 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
         value = withContext(Dispatchers.IO) { McrawStore17u.infoOf(ctx, current.uri) }
     }
     val i = info ?: return
-    var ei by remember(i) { mutableStateOf(i.ei) }
+    // 0 = Auto
+    var ei by remember(i) { mutableStateOf(if (i.auto) 0 else i.ei) }
     var out by remember(i) { mutableStateOf(i.out) }
     var msg by remember { mutableStateOf<String?>(null) }
     val working = McrawStore17u.working
     Text("MotionCam RAW", color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 2.dp))
-    Text("Developed from ${i.name} at EI ${i.ei} into ${OpenDrt.Input.of(i.out).label}. A change here develops the .mcraw " +
+        modifier = Modifier.help17u("MotionCam RAW", Help17uText.RAW).padding(start = 16.dp, top = 16.dp, bottom = 2.dp))
+    Text("Developed from ${i.name} at EI ${i.ei}${if (i.auto) " (Auto)" else ""} into ${OpenDrt.Input.of(i.out).label}. A change here develops the .mcraw " +
         "again in the background; the clip switches when it is done and keeps its grade.",
         color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-    Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 6.dp, bottom = 4.dp))
+    Text("Develop at EI", color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.help17u("Develop at EI", Help17uText.EI).padding(start = 16.dp, top = 6.dp, bottom = 4.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (v in McrawFolder17u.EIS) ToggleChip("$v", ei == v, { ei = v }, Modifier.testTag("raw:ei$v"))
+        for (v in McrawFolder17u.EIS) ToggleChip(if (v == 0) "Auto" + (if (i.auto) " (${i.ei})" else "") else "$v", ei == v, { ei = v }, Modifier.help17u("Develop at EI", Help17uText.EI).testTag("raw:ei$v"))
     }
     val outs = OpenDrt.Input.entries.filter { it != OpenDrt.Input.REC709 }
-    Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
+    Box(Modifier.help17u("Output", Help17uText.OUT).padding(horizontal = 14.dp, vertical = 4.dp)) {
         DropField("Output (log curve / gamut)", outs.map { Opt(it.key, it.label, key = it.key) }, out, "raw:out") { out = it }
     }
     // a clip developed into another output at import: its input follows the develop (once, no undo step)
@@ -62,7 +63,7 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
         val g = gs.of(current.id)
         if ((g.ei?.input ?: OpenDrt.Input.SLOG3.key) != i.out) gs.set(current.id, followDevelop(g, i.ei, i.out), record = false)
     }
-    val changed = ei != i.ei || out != i.out
+    val changed = (if (ei == 0) !i.auto else ei != i.ei || i.auto) || out != i.out
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(working ?: msg ?: if (changed) "Not developed yet" else "",
             color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
@@ -73,11 +74,11 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
             msg = null
             McrawStore17u.redevelop(ctx, old, i, newEi, newOut) { uri, summary ->
                 if (uri == null) { msg = "Not developed: ${summary.lineSequence().firstOrNull() ?: ""}"; return@redevelop }
-                msg = "Developed at EI $newEi into ${OpenDrt.Input.of(newOut).label}"
+                msg = "Developed at ${McrawFolder17u.eiLabel(newEi)} into ${OpenDrt.Input.of(newOut).label}"
                 // the clip's input follows the develop: its curve, and the EI it was shot at (the rating stays)
                 gs.setAll(ids.associateWith { id -> followDevelop(gs.of(id), newEi, newOut) })
             }
-        }, enabled = changed && working == null, modifier = Modifier.testTag("raw:develop")) { Text("Develop") }
+        }, enabled = changed && working == null, modifier = Modifier.help17u("Develop", Help17uText.DEVELOP).testTag("raw:develop")) { Text("Develop") }
     }
 }
 
@@ -85,7 +86,7 @@ fun McrawRawSection17u(gs: GradeState, clips: List<ColorClip>, current: ColorCli
 private fun followDevelop(g: se.gendut.klipp.engine.ClipGrade, ei: Int, out: String): se.gendut.klipp.engine.ClipGrade {
     val e = g.ei ?: se.gendut.klipp.engine.InputEi()
     return g.copy(
-        ei = e.copy(input = out, shot = if (e.shot > 0) ei else 0).takeIf { it.shot > 0 || it.hasWb || it.input != OpenDrt.Input.SLOG3.key },
+        ei = e.copy(input = out, shot = if (e.shot > 0 && ei > 0) ei else e.shot).takeIf { it.shot > 0 || it.hasWb || it.input != OpenDrt.Input.SLOG3.key },
         // OpenDRT nodes read the clip's curve and gamut from their input
         nodes = g.nodes.map { n -> n.drt?.let { d -> n.copy(drt = d.copy(input = out)) } ?: n },
     )

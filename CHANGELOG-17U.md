@@ -70,6 +70,10 @@ Import and timeline
 - MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
   develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Playback
   shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MCRAW Auto EI (now the default, in the picker and the RAW settings): measures the clip's middle frame and picks
+  the EI (one-third stops, 100–3200) that brings its average to 18 % grey – for import-and-export without choosing.
+- Long-press help: holding a MotionCam RAW control (EI, output, Develop) or the white balance sliders explains what
+  it does; a tap or a drag works as before.
 - MotionCam RAW settings, changeable at any time (Color → the EI chip → MotionCam RAW): "Develop at EI" and Output
   (any of Klipp's log curves and gamuts – S-Log3 / S-Gamut3.Cine, LogC3/LogC4, V-Log, DaVinci Intermediate, ACEScct …).
   Develop makes a new develop from the .mcraw in the background; the clip switches to it when done, keeps its grade,

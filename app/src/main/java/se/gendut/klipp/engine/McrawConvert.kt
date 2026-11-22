@@ -36,6 +36,59 @@ object McrawConvert {
     /** Stops of the sensor's clip over 18 % grey at [ei] (Klipp's EI terms: EI 800 = 5 stops). */
     fun headroom(ei: Int): Float = kotlin.math.log2(ei / 25f)
 
+    /** EIs Auto picks from (one-third stops) – up to 3200, which every output curve holds. */
+    private val AUTO_EIS = listOf(100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200)
+
+    /**
+     * Klipp Lab: "Auto" EI – the EI that brings the middle frame's average (the log average of its green sites, the
+     * picture only) to 18 % grey, as an exposure meter would: linear = raw × 0.18 × EI / 25, so EI = 25 / average.
+     * Rounded to one-third stops, 100–3200. null = the file could not be read. Blocking.
+     */
+    fun autoEi(ctx: Context, src: Uri): Int? {
+        if (!Mcraw.available) return null
+        val pfd = runCatching { ctx.contentResolver.openFileDescriptor(src, "r") }.getOrNull() ?: return null
+        val h = Mcraw.open(pfd.fd)
+        if (h == 0L) { pfd.close(); return null }
+        try {
+            val info = JSONObject(Mcraw.info(h))
+            val c = info.getJSONObject("container")
+            val n = info.getJSONArray("frames").length()
+            val ff = info.getJSONObject("firstFrame")
+            val w = ff.getInt("width"); val hh = ff.getInt("height")
+            val buf = ByteBuffer.allocateDirect(w * hh * 2).order(ByteOrder.LITTLE_ENDIAN)
+            val meta = Mcraw.decodeTo(h, n / 2, buf)?.let { JSONObject(it) } ?: return null
+            val blackMax = (c.optJSONArray("blackLevel")?.let { a -> (0 until a.length()).maxOf { a.getDouble(it) } } ?: 0.0).toInt() + 1
+            val empty = Mcraw.emptyBottomRows(h, blackMax)
+            val ch = if (empty >= hh / 20) hh - empty else hh
+            val black = meta.optJSONArray("dynamicBlackLevel") ?: c.optJSONArray("blackLevel") ?: JSONArray(listOf(0, 0, 0, 0))
+            val white = meta.optDouble("dynamicWhiteLevel", c.optDouble("whiteLevel", 1023.0))
+            val pattern = when (c.optString("sensorArrangment", "rggb").lowercase()) { "bggr" -> "BGGR"; "grbg" -> "GRBG"; "gbrg" -> "GBRG"; else -> "RGGB" }
+            val sb = buf.asShortBuffer()
+            var sum = 0.0; var count = 0
+            // every 8th row and column (both even, so the CFA position is the same), plus one: a green site
+            for (y0 in 0 until ch - 1 step 8) for (x0 in 0 until w - 1 step 8) {
+                val p0 = 0
+                val (x, y) = when {
+                    pattern[p0] == 'G' -> x0 to y0
+                    pattern[1] == 'G' -> x0 + 1 to y0
+                    else -> x0 to y0 + 1
+                }
+                val pos = (y and 1) * 2 + (x and 1)
+                val bl = black.optDouble(pos, 0.0)
+                val v = ((sb.get(y * w + x).toInt() and 0xFFFF) - bl) / (white - bl)
+                sum += kotlin.math.ln(v.coerceIn(1.0 / 4096, 1.0)); count++
+            }
+            if (count == 0) return null
+            val avg = kotlin.math.exp(sum / count)
+            val ei = 25.0 / avg
+            return AUTO_EIS.minByOrNull { kotlin.math.abs(kotlin.math.ln(it / ei)) }
+        } catch (e: Throwable) {
+            return null
+        } finally {
+            Mcraw.close(h); pfd.close()
+        }
+    }
+
     class Result(val uri: Uri?, val summary: String, val log: String)
 
     /**
@@ -84,7 +137,7 @@ object McrawConvert {
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
 
-            val ei = ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)
+            val ei = (ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)).takeIf { it > 0 } ?: autoEi(ctx, src) ?: 800
             line("developed at EI $ei (sensor clip ${"%.1f".format(headroom(ei))} stops over 18 % grey)")
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff, outIn.gamut)

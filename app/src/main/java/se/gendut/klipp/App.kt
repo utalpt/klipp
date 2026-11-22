@@ -1231,6 +1231,7 @@ private fun KlippAppContent(
         mcrawProgress?.let { text ->
             androidx.compose.material3.AlertDialog(onDismissRequest = {}, confirmButton = {}, title = { Text("MCRAW") }, text = { Text(text) })
         }
+        Help17uHost() // Klipp Lab: long-press help
         MessageHost(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 70.dp), toaster = toaster, layer = 0)
     }
     }
