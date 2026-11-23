@@ -59,10 +59,17 @@ Everything the fork changes, entry by entry: [CHANGELOG-17U.md](CHANGELOG-17U.md
 **⬇️ Test build** (the latest CI build of `xiaomi-17u`, installs over the previous one):
 https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
 
-🙏 Credits: Klipp by Flabbjaxaren. OpenDRT by Jed Smith. EI relation and slow-mo idea from George Kiarie's RawViewer.
-MotionCam RAW read with MotionCam's own decoder library, motioncam-decoder (Apache-2.0).
-Dolby Vision approach from Dolby's [dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor)
-sample (BSD-3-Clause-Clear).
+🙏 Credits: [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the
+[FilmCraft](https://github.com/storytold/filmcraft) engine. Film simulation from
+[spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato et al. [OpenDRT](https://github.com/jedypod/open-display-transform) by Jed Smith. EI relation
+and slow-mo idea from George Kiarie's RawViewer. MotionCam RAW read with MotionCam's own decoder library,
+[motioncam-decoder](https://github.com/mirsadm/motioncam-decoder) (Apache-2.0, with the MIT-licensed JSON for Modern
+C++ by Niels Lohmann and SIMDe). Dolby Vision approach from Dolby's
+[dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor) sample (BSD-3-Clause-Clear).
+HLG with deleted clips: the same fix as Klipp's 2797f03 by Flabbjaxaren.
+
+📐 Methods (our own code, after published work): Malvar, He and Cutler's demosaic (2004) for MotionCam RAW; Kim et
+al.'s Planckian locus fit (2002) for the white balance; ITU-R BT.2100 (HLG) and BT.2408 (SDR in HLG).
 
 ---
 
