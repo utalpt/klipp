@@ -48,7 +48,8 @@
   the MotionCam develops stay) – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off); opening a
   project then says what each kind takes.
 - 🎓 **Grading for beginners** (Settings): the fundamental steps from log or MotionCam RAW footage to a finished image.
-- ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
+- ❓ **Long-press help:** hold a slider's name, a drop-down field, a Color page button or a timeline action to see what
+  it does (controls that already had a long-press keep it).
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
   size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
   landscape, drag the grip between the picture and the timeline (double tap to reset).
