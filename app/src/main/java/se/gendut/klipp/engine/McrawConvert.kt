@@ -108,6 +108,17 @@ object McrawConvert {
                 liveWb: Pair<String, FloatArray>? = null,
                 progress: (Float) -> Unit): Result {
         val outIn = OpenDrt.Input.of(out)
+        // Klipp Lab: the develop runs below the app's own threads (decoding, sound and drawing alike), so the app stays
+        // responsive while clips develop – the screen was hard to use during an import
+        val myTid = android.os.Process.myTid()
+        val oldPriority = runCatching { android.os.Process.getThreadPriority(myTid) }.getOrDefault(0)
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND) }
+        try { return convert0(ctx, src, draft, outFile, ei, outIn, camWb, liveWb, progress) }
+        finally { runCatching { android.os.Process.setThreadPriority(myTid, oldPriority) } }
+    }
+
+    private fun convert0(ctx: Context, src: Uri, draft: Boolean, outFile: java.io.File?, ei: Int?, outIn: OpenDrt.Input,
+                         camWb: FloatArray?, liveWb: Pair<String, FloatArray>?, progress: (Float) -> Unit): Result {
         val tCall = System.nanoTime()
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
@@ -182,6 +193,7 @@ object McrawConvert {
             var sound: Sound? = null
             var soundMs = 0L
             val soundThread = Thread {
+                runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND) }
                 val ts = System.nanoTime()
                 sound = runCatching { encodeAudio(h, info.optInt("audioRate"), info.optInt("audioChannels"), t0ns) { soundFormat.complete(it) } }
                     .onFailure { line("sound: failed – $it") }.getOrNull()
@@ -206,6 +218,7 @@ object McrawConvert {
             val stop = java.util.concurrent.atomic.AtomicBoolean(false)
             val readers = List(READERS) { t ->
                 Thread {
+                    runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND) }
                     val rp = ctx.contentResolver.openFileDescriptor(src, "r")
                     val rh = rp?.let { Mcraw.open(it.fd) } ?: 0L
                     try {

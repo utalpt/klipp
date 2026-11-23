@@ -35,11 +35,14 @@ private suspend fun importAll(ctx: Context, picked: List<Uri>, names: List<Strin
     val out = ArrayList<Uri>()
     // files ready but not handed to [onEach] yet (the ones that need no develop, until the next .mcraw)
     val pending = ArrayList<Uri>()
-    fun flush() { if (pending.isNotEmpty()) { onEach?.invoke(pending.toList()); pending.clear() } }
+    // the first clip goes in at once, the next ones together every ~10 s: each import redraws the timeline and the
+    // project, and one at a time kept the screen busy
+    var flushed = false
+    var lastFlush = System.nanoTime()
+    fun flush() { if (pending.isNotEmpty()) { onEach?.invoke(pending.toList()); pending.clear(); flushed = true; lastFlush = System.nanoTime() } }
     for ((i, u) in picked.withIndex()) {
         val name = names[i]
         if (!name.endsWith(".mcraw", ignoreCase = true)) { out += u; pending += u; continue }
-        flush()
         val left = picked.size - i
         val outKey = McrawFolder17u.out(ctx)
         val quick = McrawFolder17u.quick(ctx)
@@ -52,7 +55,11 @@ private suspend fun importAll(ctx: Context, picked: List<Uri>, names: List<Strin
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
         // its proxy right away (playing the 4K 60 fps develop itself freezes the picture)
         // (a quick develop is half size: light enough to play itself; its full develop gets the proxy)
-        if (r.uri != null) { out += r.uri; onEach?.invoke(listOf(r.uri)); if (!quick) se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
+        if (r.uri != null) {
+            out += r.uri; pending += r.uri
+            if (!flushed || System.nanoTime() - lastFlush > 10_000_000_000L) flush()
+            if (!quick) se.gendut.klipp.engine.Proxies.request(ctx, r.uri)
+        }
         else { status("$name: ${r.summary}"); kotlinx.coroutines.delay(2500) }
     }
     flush()

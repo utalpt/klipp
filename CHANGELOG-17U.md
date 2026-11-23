@@ -76,6 +76,8 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- MCRAW import, the app stays usable: the develops (decoding, sound, drawing) run at background priority, and after
+  the first clip the next ones go on the timeline together every ~10 s instead of one at a time.
 - MCRAW in real time (phase 1 of RAW in the timeline, a test): Settings → MCRAW test → pick a file → Play. The .mcraw
   plays straight from the file, with no develop made: each frame is decoded (three threads) and developed on the GPU
   at the screen's size, the sound plays from the file and is the clock (late frames are dropped). EI and white balance
