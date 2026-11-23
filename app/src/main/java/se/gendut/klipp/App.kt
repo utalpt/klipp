@@ -275,9 +275,9 @@ private fun KlippAppContent(
     var mcrawProgress by remember { mutableStateOf<String?>(null) }
     val picker = rememberVideoPicker { picked ->
         scope.launch {
-            val uris = importMcraw17u(context, picked) { mcrawProgress = it }
+            // Klipp Lab: each clip goes in as soon as it is ready – editing starts while the rest develop
+            val uris = importMcraw17u(context, picked, onEach = { controller?.import(it, keepOrder = true) }) { mcrawProgress = it }
             mcrawProgress = null
-            controller?.import(uris)
             if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
         }
     }
@@ -1239,9 +1239,8 @@ private fun KlippAppContent(
                     videoPicker = false
                     // Klipp Lab: MotionCam RAW picked here is developed to S-Log3 first, in its place in the order
                     scope.launch {
-                        val uris = importMcraw17u(context, picked) { mcrawProgress = it }
+                        val uris = importMcraw17u(context, picked, onEach = { controller?.import(it, keepOrder = true) }) { mcrawProgress = it }
                         mcrawProgress = null
-                        controller?.import(uris, keepOrder = true)
                         if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
                     }
                 },
@@ -1250,8 +1249,12 @@ private fun KlippAppContent(
             )
         }
 
+        // Klipp Lab: the MotionCam develops' progress, a strip that doesn't block: the clips already in can be edited
         mcrawProgress?.let { text ->
-            androidx.compose.material3.AlertDialog(onDismissRequest = {}, confirmButton = {}, title = { Text("MCRAW") }, text = { Text(text) })
+            Text(text, color = K.OnSurface, fontSize = 13.sp, maxLines = 2,
+                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 64.dp, start = 16.dp, end = 16.dp)
+                    .clip(RoundedCornerShape(12.dp)).background(K.SurfaceHigh.copy(alpha = 0.92f)).padding(horizontal = 14.dp, vertical = 8.dp)
+                    .testTag("mcraw:progress"))
         }
         Help17uHost() // Klipp Lab: long-press help
         MessageHost(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 70.dp), toaster = toaster, layer = 0)

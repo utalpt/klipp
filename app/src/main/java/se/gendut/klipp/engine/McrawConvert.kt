@@ -199,6 +199,7 @@ object McrawConvert {
             // One decode thread was the limit (13 ms a frame, 21-27 ms with other work running). Buffers: each thread
             // holds at most one queued and one being decoded, plus the one being drawn.
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
+            val READERS = readerCount(draft)
             val nBuf = READERS * 2 + 1
             val free = ArrayBlockingQueue<ByteBuffer>(nBuf).apply { repeat(nBuf) { add(ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN)) } }
             val readyQ = List(READERS) { ArrayBlockingQueue<Frame>(1) }
@@ -337,8 +338,11 @@ object McrawConvert {
 
     private fun ms(ns: Long) = ns / 1_000_000
 
-    /** Klipp Lab: threads decoding the .mcraw's frames (each with its own handle). */
-    private const val READERS = 2
+    /**
+     * Klipp Lab: threads decoding the .mcraw's frames (each with its own handle). Two for the full develop (its GPU
+     * side is the limit, ~15 ms a frame); three for the quick one, which waited for the decode (16 ms a frame each).
+     */
+    private fun readerCount(draft: Boolean) = if (draft) 3 else 2
 
     /**
      * Klipp Lab: every develop adds its log to Android/data/<app>/files/mcraw_log.txt (newest last, kept under ~1 MB),

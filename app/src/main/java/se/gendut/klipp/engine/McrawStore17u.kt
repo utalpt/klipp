@@ -128,6 +128,9 @@ object McrawStore17u {
         }
     }
 
+    /** An import is developing its .mcraw files ([finishDrafts] waits for it). */
+    @Volatile var importing = false
+
     /** Drafts waiting for (or making) their full develop. */
     var drafts by androidx.compose.runtime.mutableIntStateOf(0)
     private val queued = java.util.Collections.synchronizedSet(HashSet<String>())
@@ -149,7 +152,8 @@ object McrawStore17u {
                 fullLock.withLock {
                     val info = infoOf(app, u)
                     val r = if (info == null) null else {
-                        while (working != null) kotlinx.coroutines.delay(500) // a Develop from the RAW settings
+                        // after an import still developing (both at once would slow each other) and a Develop from the RAW settings
+                        while (importing || working != null) kotlinx.coroutines.delay(500)
                         working = "${info.name} (full size): 0 %"
                         runCatching {
                             develop(app, info.source, info.name, info.ei, info.out, info.camWb?.toFloatArray(), auto = info.auto) { p ->
@@ -160,7 +164,7 @@ object McrawStore17u {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (info != null) working = null
                         drafts = (drafts - 1).coerceAtLeast(0)
-                        if (drafts == 0) Proxies.hold(false)
+                        if (drafts == 0 && !importing) Proxies.hold(false)
                         queued.remove(u.toString())
                         if (r?.uri != null) relink?.invoke(u, r.uri)
                     }

@@ -10,7 +10,9 @@ import kotlinx.coroutines.withContext
  * the same order – into the app's own storage (McrawStore17u), at the picker's EI; the .mcraw stays the source. [status] shows the progress. A file that fails to convert
  * is left out, with the reason shown for a moment.
  */
-suspend fun importMcraw17u(ctx: Context, picked: List<Uri>, status: (String) -> Unit): List<Uri> {
+suspend fun importMcraw17u(ctx: Context, picked: List<Uri>,
+                           /** Klipp Lab: each file as soon as it is ready (the others still developing), in order. */
+                           onEach: ((List<Uri>) -> Unit)? = null, status: (String) -> Unit): List<Uri> {
     val names = withContext(Dispatchers.IO) {
         picked.map { u ->
             runCatching {
@@ -18,24 +20,41 @@ suspend fun importMcraw17u(ctx: Context, picked: List<Uri>, status: (String) -> 
             }.getOrNull().orEmpty()
         }
     }
-    if (names.none { it.endsWith(".mcraw", ignoreCase = true) }) return picked
+    if (names.none { it.endsWith(".mcraw", ignoreCase = true) }) { onEach?.invoke(picked); return picked }
+    // proxies wait while the develops run (they share the reads, the GPU and the encoder)
+    val store = se.gendut.klipp.engine.McrawStore17u
+    store.importing = true
+    se.gendut.klipp.engine.Proxies.hold(true)
+    try { return importAll(ctx, picked, names, onEach, status) } finally {
+        store.importing = false
+        if (store.drafts == 0) se.gendut.klipp.engine.Proxies.hold(false)
+    }
+}
+
+private suspend fun importAll(ctx: Context, picked: List<Uri>, names: List<String>, onEach: ((List<Uri>) -> Unit)?, status: (String) -> Unit): List<Uri> {
     val out = ArrayList<Uri>()
+    // files ready but not handed to [onEach] yet (the ones that need no develop, until the next .mcraw)
+    val pending = ArrayList<Uri>()
+    fun flush() { if (pending.isNotEmpty()) { onEach?.invoke(pending.toList()); pending.clear() } }
     for ((i, u) in picked.withIndex()) {
         val name = names[i]
-        if (!name.endsWith(".mcraw", ignoreCase = true)) { out += u; continue }
+        if (!name.endsWith(".mcraw", ignoreCase = true)) { out += u; pending += u; continue }
+        flush()
+        val left = picked.size - i
         val outKey = McrawFolder17u.out(ctx)
         val quick = McrawFolder17u.quick(ctx)
         val outName = se.gendut.klipp.engine.OpenDrt.Input.of(outKey).label
-        status("Developing $name to $outName…")
+        status("Developing $name to $outName… ($left left)")
         val r = withContext(Dispatchers.Default) {
             // (the status is Compose state: setting it from the conversion's thread is fine)
-            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey, draft = quick) { p -> status("Developing $name to $outName${if (quick) " (quick)" else ""}… ${(p * 100).toInt()} %") }
+            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey, draft = quick) { p -> status("Developing $name to $outName${if (quick) " (quick)" else ""}… ${(p * 100).toInt()} % ($left left)") }
         }
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
         // its proxy right away (playing the 4K 60 fps develop itself freezes the picture)
         // (a quick develop is half size: light enough to play itself; its full develop gets the proxy)
-        if (r.uri != null) { out += r.uri; if (!quick) se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
+        if (r.uri != null) { out += r.uri; onEach?.invoke(listOf(r.uri)); if (!quick) se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
         else { status("$name: ${r.summary}"); kotlinx.coroutines.delay(2500) }
     }
+    flush()
     return out
 }

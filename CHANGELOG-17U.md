@@ -76,6 +76,9 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- MCRAW import, editing sooner: each clip goes on the timeline as soon as its develop is done (the rest keep developing,
+  shown in a strip at the top that doesn't block the app, with how many are left); the quick develop decodes on three
+  threads (it waited for two); proxies and the background full develops wait while an import is developing.
 - MCRAW develop: the frames are decoded on two threads (one was the limit: 13 ms a frame, 21-27 ms with other work
   beside it), and proxies wait while the full develops of a Quick import run in the background (they competed for the
   same reads, GPU and encoder), then follow.
