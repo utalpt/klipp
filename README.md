@@ -43,9 +43,10 @@
 - 🔲 The selection box scrolls the timeline at the edges.
 - 🧲 **Close gaps:** hold a track's header → Close gaps, or Close gap beside Delete for a selected clip – the clip
   moves back to the one before it, linked clips follow.
-- 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – proxies, node cache, renders,
-  each with its Clear, plus Clear caches – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off);
-  opening a project then says what each kind takes.
+- 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – MotionCam develops,
+  proxies, node cache and renders, each with its Clear, plus Clear caches (proxies, node cache and renders at once;
+  the MotionCam develops stay) – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off); opening a
+  project then says what each kind takes.
 - 🎓 **Grading for beginners** (Settings): the fundamental steps from log or MotionCam RAW footage to a finished image.
 - ❓ **Long-press help:** hold a slider's name, a drop-down field or a timeline action still to see what it does.
 - 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
