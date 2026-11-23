@@ -108,6 +108,7 @@ object McrawConvert {
                 liveWb: Pair<String, FloatArray>? = null,
                 progress: (Float) -> Unit): Result {
         val outIn = OpenDrt.Input.of(out)
+        val tCall = System.nanoTime()
         val log = StringBuilder()
         fun line(s: String) { log.append(s).append('\n') }
         if (!Mcraw.available) return Result(null, "MCRAW library not loaded", "")
@@ -143,7 +144,10 @@ object McrawConvert {
             val bitrate = (ow.toLong() * oh * fps * 0.25).toLong().coerceIn(20_000_000L, 400_000_000L).toInt()
             line("bitrate: ${bitrate / 1_000_000} Mb/s")
 
-            val ei = (ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)).takeIf { it > 0 } ?: autoEi(ctx, src) ?: 800
+            val tAuto = System.nanoTime()
+            val eiSet = (ei ?: se.gendut.klipp.McrawFolder17u.ei(ctx)).takeIf { it > 0 }
+            val ei = eiSet ?: autoEi(ctx, src) ?: 800
+            if (eiSet == null) line("auto EI: $ei in ${ms(System.nanoTime() - tAuto)} ms")
             line("developed at EI $ei (sensor clip ${"%.1f".format(headroom(ei))} stops over 18 % grey)")
             val cfa = c.optString("sensorArrangment", "rggb")
             val camToOut = colorMatrix(c, ff, outIn.gamut)
@@ -171,10 +175,17 @@ object McrawConvert {
                 else ctx.contentResolver.openFileDescriptor(outUri!!, "rw")) ?: return Result(null, "Could not open the output file", log.toString())
 
             val tStart = System.nanoTime()
+            line("before the frames: ${ms(tStart - tCall)} ms (open, picture height, EI, colour, output file)")
             // the sound: AAC, encoded first (it is small), written once the muxer starts
             val sound = runCatching { encodeAudio(h, info.optInt("audioRate"), info.optInt("audioChannels"), t0ns) }
                 .onFailure { line("sound: failed – $it") }.getOrNull()
             if (sound != null) line("sound: ${sound.samples.size} AAC frames, starts at ${"%.3f".format(sound.offsetUs / 1e6)} s")
+            line("sound encoded in ${ms(System.nanoTime() - tStart)} ms")
+            // Klipp Lab: where the time goes, per stage (for optimizing): decode on the reader thread; on this one the
+            // wait for a decoded frame, the upload and draw (texture upload is a CPU copy), the swap (blocks when the
+            // encoder has no free input buffer or the GPU is behind) and the drain to the muxer
+            val tDecode = java.util.concurrent.atomic.AtomicLong(0)
+            var tWait = 0L; var tDraw = 0L; var tSwap = 0L; var tDrain = 0L
             val bytes = w * hh * 2
             // decoded frames, in order, from a second thread (three buffers in flight)
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
@@ -188,7 +199,9 @@ object McrawConvert {
                     for (i in 0 until n) {
                         if (stop.get()) break
                         val b = free.take()
+                        val td = System.nanoTime()
                         val m = if (rh != 0L) Mcraw.decodeTo(rh, i, b) else null
+                        tDecode.addAndGet(System.nanoTime() - td)
                         ready.put(Frame(i, b, m?.let { JSONObject(it) }))
                     }
                 } catch (_: InterruptedException) {
@@ -249,18 +262,25 @@ object McrawConvert {
                     gl.setup(cfa, c, camToOut, headroom(ei), draft, outIn.oetf)
                     gl.wbCam = wbCam
                     for (k in 0 until n) {
+                        var t = System.nanoTime()
                         val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
+                        var t2 = System.nanoTime(); tWait += t2 - t; t = t2
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
                         gl.drawFrame(f.buf, f.meta, c)
                         free.put(f.buf)
+                        t2 = System.nanoTime(); tDraw += t2 - t; t = t2
                         gl.present((frames.getLong(f.index) - t0ns))
+                        t2 = System.nanoTime(); tSwap += t2 - t; t = t2
                         encoded++
                         drain(false)
+                        tDrain += System.nanoTime() - t
                         if (k % 4 == 0) progress(k / n.toFloat())
                     }
                 } finally { gl.release() }
+                val tEnd = System.nanoTime()
                 codec.signalEndOfInputStream()
                 drain(true)
+                line("end of stream: ${ms(System.nanoTime() - tEnd)} ms")
                 codec.stop(); codec.release()
                 if (track >= 0) muxer.stop()
                 muxer.release()
@@ -270,21 +290,40 @@ object McrawConvert {
                 outPfd.close()
             }
             val secs = (System.nanoTime() - tStart) / 1e9
+            val per = encoded.coerceAtLeast(1) * 1e6
+            line("per frame (ms): decode ${"%.1f".format(tDecode.get() / per)} (reader thread) · wait ${"%.1f".format(tWait / per)} · " +
+                "upload+draw ${"%.1f".format(tDraw / per)} · swap ${"%.1f".format(tSwap / per)} · drain ${"%.1f".format(tDrain / per)}")
+            line("total with the steps before: ${"%.1f".format((System.nanoTime() - tCall) / 1e9)} s")
             if (part != null) { if (!part.renameTo(outFile!!)) error("could not write ${outFile.name}") }
             else ctx.contentResolver.update(outUri!!, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)
             progress(1f)
             line("encoded $encoded frames (failed $failed) in ${"%.1f".format(secs)} s → ${"%.1f".format(encoded / secs)} fps (${"%.2f".format(encoded / secs / fps)}× real time)")
             val summary = "Converted $encoded frames in ${"%.1f".format(secs)} s (${"%.1f".format(encoded / secs)} fps, ${"%.2f".format(encoded / secs / fps)}× real time)\n" +
                 (outFile?.name ?: "Movies/Klipp Lab/${base}_SLog3${if (draft) "_draft" else ""}.mp4") + " – " + "${ow}×$oh 10-bit HEVC${if (sound != null) " with sound" else ", no sound"}. In Klipp: input ${outIn.label}, developed at EI $ei."
+            appendLog(ctx, summary, log)
             return Result(outUri, summary, log.toString(), wbCam)
         } catch (e: Throwable) {
             line("error: $e")
+            appendLog(ctx, "Conversion failed: ${e.message}", log)
             if (outFile != null) runCatching { java.io.File(outFile.path + ".part").delete() }
             else outUri?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             return Result(null, "Conversion failed: ${e.message}", log.toString())
         } finally {
             Mcraw.close(h); pfd.close()
         }
+    }
+
+    private fun ms(ns: Long) = ns / 1_000_000
+
+    /**
+     * Klipp Lab: every develop adds its log to Android/data/<app>/files/mcraw_log.txt (newest last, kept under ~1 MB),
+     * so a series of imports can be timed afterwards.
+     */
+    private fun appendLog(ctx: Context, summary: String, log: StringBuilder) = runCatching {
+        val f = java.io.File(ctx.getExternalFilesDir(null), "mcraw_log.txt")
+        if (f.length() > 1_000_000) f.writeText(f.readText().takeLast(500_000))
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date())
+        f.appendText("=== $stamp\n$summary\n$log\n")
     }
 
     private class Sound(val format: MediaFormat, val samples: List<Pair<ByteArray, MediaCodec.BufferInfo>>, val offsetUs: Long)
