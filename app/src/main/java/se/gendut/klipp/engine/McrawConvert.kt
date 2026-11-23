@@ -474,7 +474,7 @@ object McrawConvert {
      * clipped highlights stay white): [base] (a develop's) times the gains [live] sets on a log gamut's primaries,
      * turned into camera gains – the camera colour those gains make neutral becomes neutral. Luminance is kept.
      */
-    private fun cameraWb(c: JSONObject, ff: JSONObject, base: FloatArray?, live: Pair<String, FloatArray>?): FloatArray {
+    internal fun cameraWb(c: JSONObject, ff: JSONObject, base: FloatArray?, live: Pair<String, FloatArray>?): FloatArray {
         val b = base?.takeIf { it.size == 3 } ?: floatArrayOf(1f, 1f, 1f)
         val (key, g) = live ?: return b
         if (g.size != 3 || g.all { kotlin.math.abs(it - 1f) < 1e-4f }) return b
@@ -504,7 +504,9 @@ object McrawConvert {
     // ---- GPU ----
 
     /** [h] the frame's rows (texture), [ch] the rows with picture (from the top), [ow] × [oh] the output. */
-    private class Gl(surface: android.view.Surface, val w: Int, val h: Int, val ch: Int, val ow: Int, val oh: Int) {
+    internal class Gl(surface: android.view.Surface, val w: Int, val h: Int, val ch: Int, val ow: Int, val oh: Int,
+                      /** Klipp Lab: 10 for the encoder; the real-time player (McrawPlayer17u) falls back to 8 on a screen. */
+                      bits: Int = 10, recordable: Boolean = true) {
         val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         val context: EGLContext
         val eglSurface: EGLSurface
@@ -525,11 +527,13 @@ object McrawConvert {
 
         init {
             val v = IntArray(2); EGL14.eglInitialize(display, v, 0, v, 1)
+            val alpha = if (bits == 10) 2 else 8
             val attrs = intArrayOf(
-                EGL14.EGL_RED_SIZE, 10, EGL14.EGL_GREEN_SIZE, 10, EGL14.EGL_BLUE_SIZE, 10, EGL14.EGL_ALPHA_SIZE, 2,
-                EGL14.EGL_RENDERABLE_TYPE, EGLExt.EGL_OPENGL_ES3_BIT_KHR, EGL_RECORDABLE_ANDROID, 1, EGL14.EGL_NONE)
+                EGL14.EGL_RED_SIZE, bits, EGL14.EGL_GREEN_SIZE, bits, EGL14.EGL_BLUE_SIZE, bits, EGL14.EGL_ALPHA_SIZE, alpha,
+                EGL14.EGL_RENDERABLE_TYPE, EGLExt.EGL_OPENGL_ES3_BIT_KHR) +
+                (if (recordable) intArrayOf(EGL_RECORDABLE_ANDROID, 1) else intArrayOf()) + intArrayOf(EGL14.EGL_NONE)
             val cfgs = arrayOfNulls<EGLConfig>(1); val num = IntArray(1)
-            check(EGL14.eglChooseConfig(display, attrs, 0, cfgs, 0, 1, num, 0) && num[0] > 0) { "no 10-bit EGL config" }
+            check(EGL14.eglChooseConfig(display, attrs, 0, cfgs, 0, 1, num, 0) && num[0] > 0) { "no $bits-bit EGL config" }
             context = EGL14.eglCreateContext(display, cfgs[0], EGL14.EGL_NO_CONTEXT, intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE), 0)
             eglSurface = EGL14.eglCreateWindowSurface(display, cfgs[0], surface, intArrayOf(EGL14.EGL_NONE), 0)
             check(EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) { "eglMakeCurrent failed" }
@@ -651,6 +655,14 @@ object McrawConvert {
             }
             return best
         }
+
+        /** Klipp Lab: the exposure of [headroom] (stops of the sensor's clip over 18 % grey), changed live (player). */
+        fun setExpo(headroom: Float) {
+            GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, headroom.toDouble()).toFloat())
+        }
+
+        /** Klipp Lab: shows the frame on a screen's surface (the player; no presentation time). */
+        fun swap() { EGL14.eglSwapBuffers(display, eglSurface) }
 
         fun present(ptsNs: Long) {
             EGLExt.eglPresentationTimeANDROID(display, eglSurface, ptsNs)

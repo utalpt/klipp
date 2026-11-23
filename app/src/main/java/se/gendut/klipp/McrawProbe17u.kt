@@ -41,6 +41,9 @@ fun McrawProbeRow(ctx: Context) {
     var lastUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var converting by remember { mutableStateOf(false) }
     var converted by remember { mutableStateOf<se.gendut.klipp.engine.McrawConvert.Result?>(null) }
+    // Klipp Lab: the file played in real time from the RAW (phase 1 of RAW in the timeline)
+    var playUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    playUri?.let { McrawPlayerScreen17u(it) { playUri = null } }
     val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         running = true; progress = 0f; lastUri = uri
@@ -63,6 +66,7 @@ fun McrawProbeRow(ctx: Context) {
             confirmButton = { FlatTextButton(onClick = { result = null }) { Text("OK") } },
             // develop the file into an S-Log3 clip (Movies/Klipp Lab) and time it
             dismissButton = {
+                FlatTextButton(onClick = { result = null; playUri = lastUri }, modifier = Modifier.testTag("set:mcrawPlay")) { Text("Play") }
                 FlatTextButton(onClick = {
                     val uri = lastUri ?: return@FlatTextButton
                     result = null; converting = true; progress = 0f
