@@ -14,3 +14,5 @@
 
 # Krasch-rapporter: behåll rader och filnamn i stackspår (kartfilen sparas av bygget).
 -keepattributes SourceFile,LineNumberTable
+
+-keep class se.gendut.klipp.engine.CrawImport { native <methods>; }

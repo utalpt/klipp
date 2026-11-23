@@ -53,3 +53,15 @@ target_include_directories(klipp_mcraw PRIVATE ${MCD}/lib/include ${MCD}/thirdpa
 target_compile_options(klipp_mcraw PRIVATE -O3 -fexceptions -frtti -fvisibility=hidden -ffunction-sections -fdata-sections)
 target_link_options(klipp_mcraw PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 target_link_libraries(klipp_mcraw ${LOG_LIB})
+
+set(CRAW_ROOT ${KLIPP_ROOT}/third_party/craw)
+add_library(klipp_craw SHARED
+    craw_jni.cpp
+    ${CRAW_ROOT}/src/Decoder.cpp
+    ${CRAW_ROOT}/src/Reader.cpp
+    ${CRAW_ROOT}/tools/common/Clip.cpp
+)
+target_compile_features(klipp_craw PRIVATE cxx_std_20)
+target_include_directories(klipp_craw PRIVATE ${CRAW_ROOT}/include ${CRAW_ROOT}/tools)
+target_compile_options(klipp_craw PRIVATE -O3 -fvisibility=hidden)
+target_link_options(klipp_craw PRIVATE -Wl,-z,max-page-size=16384)
