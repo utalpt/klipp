@@ -38,18 +38,26 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
         private set
 
     private var thread: Thread? = null
-    @Volatile private var running = false
+    /** Each start is a generation: a thread of an older one stops (only one may draw on the surface). */
+    @Volatile private var gen = 0
+    private val lock = Any()
 
     /** Starts on [surface] ([sw] × [sh] pixels) developing into [outKey] (an [OpenDrt.Input] key). */
-    fun start(surface: android.view.Surface, sw: Int, sh: Int, outKey: String) {
-        stop()
-        running = true
-        thread = Thread({ runCatching { run(surface, sw, sh, outKey) }.onFailure { stats = "Stopped: ${it.message ?: it}"; android.util.Log.e("KlippMcraw", "player", it) } },
-            "mcraw-player").apply { start() }
+    fun start(surface: android.view.Surface, sw: Int, sh: Int, outKey: String) = synchronized(lock) {
+        stop0()
+        val my = ++gen
+        thread = Thread({
+            runCatching { run(surface, sw, sh, outKey, my) }.onFailure {
+                if (gen == my) stats = "Stopped: ${it.message ?: it}"
+                android.util.Log.e("KlippMcraw", "player", it)
+            }
+        }, "mcraw-player-$my").apply { start() }
     }
 
-    fun stop() {
-        running = false
+    fun stop() = synchronized(lock) { stop0() }
+
+    private fun stop0() {
+        gen++
         thread?.let { it.interrupt(); it.join(3000) }
         thread = null
     }
@@ -98,7 +106,8 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
         }
     }
 
-    private fun run(surface: android.view.Surface, sw: Int, sh: Int, outKey: String) {
+    private fun run(surface: android.view.Surface, sw: Int, sh: Int, outKey: String, my: Int) {
+        fun running() = gen == my
         check(Mcraw.available) { "MCRAW library not loaded" }
         val pfd = ctx.contentResolver.openFileDescriptor(src, "r") ?: error("could not open the file")
         val h = Mcraw.open(pfd.fd)
@@ -185,7 +194,7 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
             var shown = 0; var dropped = 0; var drawNs = 0L; var lastStats = System.nanoTime()
             var decodeMark = 0L
 
-            while (running) {
+            while (running()) {
                 // seek: the readers start again at the frame, the sound at its time
                 val s = seekTo
                 if (s >= 0f) {
@@ -206,7 +215,10 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
                     } else { track?.pause(); wallBase = times[(k - 1).coerceIn(0, n - 1)] }
                 }
                 // live settings
-                if (ei != shownEi) { shownEi = ei; g.setExpo(McrawConvert.headroom(shownEi)); needDraw = true }
+                if (ei != shownEi) {
+                    shownEi = ei; g.setExpo(McrawConvert.headroom(shownEi)); needDraw = true
+                    android.util.Log.i("KlippMcraw", "player: EI $shownEi")
+                }
                 if ((temp to tint) != shownWb) { shownWb = temp to tint; g.wbCam = wb(); needDraw = true }
 
                 if (!playing && !needDraw) { Thread.sleep(15); continue }
@@ -245,9 +257,10 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
                     val secs = (now - lastStats) / 1e9
                     val dec = (rd.decodeNs - decodeMark).coerceAtLeast(0L)
                     val decoded = shown + dropped
-                    stats = "%.0f fps shown · %.0f dropped/s · decode %.1f ms (each, 3 threads) · draw %.1f ms · %d×%d %s".format(
+                    stats = "%.0f fps shown · %.0f dropped/s · decode %.1f ms (each, 3 threads) · draw %.1f ms · %d×%d %s · EI %d %s · #%d".format(
                         shown / secs, dropped / secs, if (decoded > 0) dec / 1e6 / decoded else 0.0,
-                        if (shown > 0) drawNs / 1e6 / shown else 0.0, vw, vh, if (track != null) "· sound clock" else "· no sound")
+                        if (shown > 0) drawNs / 1e6 / shown else 0.0, vw, vh, if (track != null) "· sound clock" else "· no sound",
+                        shownEi, out.name, my)
                     shown = 0; dropped = 0; drawNs = 0; lastStats = now
                     decodeMark = rd.decodeNs
                 }

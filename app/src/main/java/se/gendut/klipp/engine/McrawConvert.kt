@@ -671,6 +671,7 @@ object McrawConvert {
 
         /** Klipp Lab: the exposure of [headroom] (stops of the sensor's clip over 18 % grey), changed live (player). */
         fun setExpo(headroom: Float) {
+            GLES30.glUseProgram(program)
             GLES30.glUniform1f(loc("expo"), 0.18f * Math.pow(2.0, headroom.toDouble()).toFloat())
         }
 
