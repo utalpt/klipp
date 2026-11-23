@@ -86,7 +86,9 @@ fun McrawPlayerScreen17u(uri: Uri, onClose: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
-            Text(stats, color = K.OnSurfaceVar, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            // the diagnostic line: what the phone keeps up with (white on a dark strip, under the picture)
+            Text(stats.ifEmpty { "Starting…" }, color = Color.White, fontSize = 13.sp,
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF222222)).padding(horizontal = 16.dp, vertical = 8.dp).testTag("mcrawPlayer:stats"))
             Slider(value = pos, onValueChange = { seeking = true; pos = it; player.seekTo = it }, onValueChangeFinished = { seeking = false },
                 modifier = Modifier.padding(horizontal = 12.dp).testTag("mcrawPlayer:seek"))
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
