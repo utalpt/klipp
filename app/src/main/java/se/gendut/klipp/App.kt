@@ -345,6 +345,13 @@ private fun KlippAppContent(
             notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
         if (c.snapshot.sequence?.video?.any { it.clips.isNotEmpty() } != true) { toaster.show(Str.t(R.string.app_timeline_empty)); return }
+        // Klipp Lab: MotionCam clips still in their quick (half size) develop: the export waits for the full ones
+        val drafts = c.snapshot.media.count { m -> se.gendut.klipp.engine.McrawStore17u.isDraft(context, c.uriOf(m.id)) }
+        if (drafts > 0) {
+            toaster.show("$drafts MotionCam clip(s) still developing at full size" +
+                (se.gendut.klipp.engine.McrawStore17u.working?.let { " ($it)" } ?: "") + " – export when they're done.")
+            return
+        }
         state.playing = false
         exportAsk = true
     }

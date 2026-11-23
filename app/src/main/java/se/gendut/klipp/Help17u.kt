@@ -201,6 +201,10 @@ object Help17uText {
         "highlights stay white), and the live one goes back to As shot. " +
         "The clip switches to the new develop when it is done and keeps its grade; its input and OpenDRT nodes follow " +
         "the new curve. The old develop is removed when no project uses it."
+    const val QUICK = "On: each clip is first developed at half size (about twice as fast, no demosaic), so you can edit " +
+        "at once; the full develop follows in the background, one clip at a time, and takes the draft's place when done " +
+        "(the progress shows in the clip's RAW settings). Export waits until every clip is full size. Off: the full develop " +
+        "at import."
     const val RAW = "This clip is a develop of a MotionCam .mcraw. The EI and the output are baked into the develop and " +
         "can be changed here at any time (a new develop). White balance and the rated EI above are live, on top of it."
     const val TEMP = "White balance in the linear light, before the nodes, as in a raw developer. As shot = the clip as it " +

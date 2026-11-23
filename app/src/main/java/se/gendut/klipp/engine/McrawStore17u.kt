@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.io.File
 
@@ -27,11 +28,21 @@ object McrawStore17u {
      * The develop of [src] (named [name]) at [ei] into [out] (an [OpenDrt.Input] key): the same source at the same
      * settings is the same file.
      */
-    fun fileFor(c: Context, src: Uri, name: String, ei: Int, out: String = DEFAULT_OUT, wb: String = ""): File {
+    fun fileFor(c: Context, src: Uri, name: String, ei: Int, out: String = DEFAULT_OUT, wb: String = "", draft: Boolean = false): File {
         val base = name.substringBeforeLast('.').replace(Regex("[^A-Za-z0-9_.-]"), "_").take(60)
-        val key = src.toString() + "|ei" + ei + (if (out != DEFAULT_OUT) "|$out" else "") + (if (wb.isNotEmpty()) "|wb$wb" else "")
+        val key = src.toString() + "|ei" + ei + (if (out != DEFAULT_OUT) "|$out" else "") + (if (wb.isNotEmpty()) "|wb$wb" else "") + (if (draft) "|draft" else "")
         val h = key.hashCode().toUInt().toString(16)
-        return File(dir(c), "${base}_ei${ei}${if (out != DEFAULT_OUT) "_$out" else ""}${if (wb.isNotEmpty()) "_wb" else ""}_$h.mp4")
+        return File(dir(c), "${base}_ei${ei}${if (out != DEFAULT_OUT) "_$out" else ""}${if (wb.isNotEmpty()) "_wb" else ""}${if (draft) DRAFT else ""}_$h.mp4")
+    }
+
+    /** Klipp Lab: a quick develop's file name mark (half size, see [develop]'s draft). */
+    private const val DRAFT = "_draft"
+
+    /** A quick (half size) develop, still waiting for its full one ([finishDrafts]). */
+    fun isDraft(c: Context, uri: Uri?): Boolean {
+        if (uri == null || uri.scheme != "file") return false
+        val f = File(uri.path ?: return false)
+        return f.parentFile?.absolutePath == dir(c).absolutePath && f.name.contains(DRAFT + "_")
     }
 
     /** The white balance settings as a key (empty = as shot). */
@@ -43,16 +54,18 @@ object McrawStore17u {
     /** Develops [src] (or reuses its develop). Blocking: call off the main thread. */
     /** [ei0] ≤ 0: Auto ([McrawConvert.autoEi], 800 when the file can't be measured). */
     /** [camWb], [liveWb]: white balance (see McrawConvert.convert). */
+    /** [draft]: half size, no demosaic – quick, for editing; [finishDrafts] makes the full one in the background. */
+    /** [auto]: the EI was picked by Auto (kept when a draft's EI is used again for its full develop). */
     fun develop(c: Context, src: Uri, name: String, ei0: Int, out: String = DEFAULT_OUT,
-                camWb: FloatArray? = null, liveWb: Pair<String, FloatArray>? = null, progress: (Float) -> Unit): McrawConvert.Result {
-        val auto = ei0 <= 0
-        val ei = if (auto) McrawConvert.autoEi(c, src) ?: 800 else ei0
-        val f = fileFor(c, src, name, ei, out, wbKey(camWb, liveWb))
+                camWb: FloatArray? = null, liveWb: Pair<String, FloatArray>? = null, draft: Boolean = false,
+                auto: Boolean = ei0 <= 0, progress: (Float) -> Unit): McrawConvert.Result {
+        val ei = if (ei0 <= 0) McrawConvert.autoEi(c, src) ?: 800 else ei0
+        val f = fileFor(c, src, name, ei, out, wbKey(camWb, liveWb), draft)
         if (f.exists() && f.length() > 0) {
             if (infoOfFile(c, f) == null) record(c, f, src, name, ei, out, auto, camWb)
             return McrawConvert.Result(Uri.fromFile(f), "Reused ${f.name}", "")
         }
-        val r = McrawConvert.convert(c, src, outFile = f, ei = ei, out = out, camWb = camWb, liveWb = liveWb, progress = progress)
+        val r = McrawConvert.convert(c, src, draft = draft, outFile = f, ei = ei, out = out, camWb = camWb, liveWb = liveWb, progress = progress)
         if (r.uri != null) { record(c, f, src, name, ei, out, auto, r.camWb); revision++ }
         return r
     }
@@ -111,6 +124,46 @@ object McrawStore17u {
                 working = null
                 if (r.uri != null && r.uri != old) relink?.invoke(old, r.uri)
                 done(r.uri, r.summary)
+            }
+        }
+    }
+
+    /** Drafts waiting for (or making) their full develop. */
+    var drafts by androidx.compose.runtime.mutableIntStateOf(0)
+    private val queued = java.util.Collections.synchronizedSet(HashSet<String>())
+    private val fullLock = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Klipp Lab: the quick develops among [uris] (the open project's files) get their full develop in the background,
+     * one at a time, each put in the draft's place when done ([relink]). Called whenever the project changes, so a
+     * project opened again finishes what was left (a full develop already made is reused at once).
+     */
+    fun finishDrafts(c: Context, uris: Collection<Uri>) {
+        val app = c.applicationContext
+        for (u in uris) {
+            if (!isDraft(app, u) || !queued.add(u.toString())) continue
+            drafts++
+            bg.launch {
+                // a moment first: the import that brought the draft in is still adding it to the project
+                kotlinx.coroutines.delay(1500)
+                fullLock.withLock {
+                    val info = infoOf(app, u)
+                    val r = if (info == null) null else {
+                        while (working != null) kotlinx.coroutines.delay(500) // a Develop from the RAW settings
+                        working = "${info.name} (full size): 0 %"
+                        runCatching {
+                            develop(app, info.source, info.name, info.ei, info.out, info.camWb?.toFloatArray(), auto = info.auto) { p ->
+                                working = "${info.name} (full size): ${(p * 100).toInt()} %"
+                            }
+                        }.getOrNull()
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (info != null) working = null
+                        drafts = (drafts - 1).coerceAtLeast(0)
+                        queued.remove(u.toString())
+                        if (r?.uri != null) relink?.invoke(u, r.uri)
+                    }
+                }
             }
         }
     }

@@ -24,15 +24,17 @@ suspend fun importMcraw17u(ctx: Context, picked: List<Uri>, status: (String) -> 
         val name = names[i]
         if (!name.endsWith(".mcraw", ignoreCase = true)) { out += u; continue }
         val outKey = McrawFolder17u.out(ctx)
+        val quick = McrawFolder17u.quick(ctx)
         val outName = se.gendut.klipp.engine.OpenDrt.Input.of(outKey).label
         status("Developing $name to $outName…")
         val r = withContext(Dispatchers.Default) {
             // (the status is Compose state: setting it from the conversion's thread is fine)
-            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey) { p -> status("Developing $name to $outName… ${(p * 100).toInt()} %") }
+            se.gendut.klipp.engine.McrawStore17u.develop(ctx, u, name, McrawFolder17u.ei(ctx), outKey, draft = quick) { p -> status("Developing $name to $outName${if (quick) " (quick)" else ""}… ${(p * 100).toInt()} %") }
         }
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "mcraw_convert.txt").writeText(r.summary + "\n" + r.log) }
         // its proxy right away (playing the 4K 60 fps develop itself freezes the picture)
-        if (r.uri != null) { out += r.uri; se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
+        // (a quick develop is half size: light enough to play itself; its full develop gets the proxy)
+        if (r.uri != null) { out += r.uri; if (!quick) se.gendut.klipp.engine.Proxies.request(ctx, r.uri) }
         else { status("$name: ${r.summary}"); kotlinx.coroutines.delay(2500) }
     }
     return out

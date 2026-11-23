@@ -25,7 +25,7 @@
 - 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
   linear light before all nodes, as in a raw developer – live while dragging.
 - 📸 **MotionCam RAW (.mcraw) in:** the video picker's MotionCam RAW chip lists the .mcraw files of MotionCam's folder; importing
-  develops each one into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
+  develops each one (Quick import: half size first, the full develop in the background) into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
   with the camera's white balance. The RAW settings stay changeable afterwards, as in a raw developer: on the Color page
   pick another EI or log and Develop again (the clip is swapped in place, with a new proxy), and the clip's
   Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. *(Early:

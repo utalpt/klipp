@@ -64,6 +64,9 @@ object McrawFolder17u {
     /** The EI the files are developed at (the sensor's clip log2(EI/25) stops over 18 % grey). */
     /** 0 = Auto (measured per file, see McrawConvert.autoEi). */
     fun ei(c: Context): Int = p(c).getInt("ei2", 0)
+    /** Klipp Lab: import a quick half-size develop first (the full one follows in the background). */
+    fun quick(c: Context): Boolean = p(c).getBoolean("quick", true)
+    fun setQuick(c: Context, on: Boolean) { p(c).edit().putBoolean("quick", on).apply() }
     fun setEi(c: Context, ei: Int) { p(c).edit().putInt("ei2", ei).apply() }
     /** The chips: 0 = Auto. */
     val EIS = listOf(0, 400, 800, 1600, 3200)
@@ -111,6 +114,11 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onList: (List<Uri>) -> Unit = {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             items(McrawFolder17u.EIS) { v -> ToggleChip(McrawFolder17u.eiLabel(v), ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.testTag("mcraw:ei$v"), help = "Develop at EI" to Help17uText.EI) }
         }
+    }
+    var quick by remember { mutableStateOf(McrawFolder17u.quick(ctx)) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        ToggleChip("Quick import", quick, { quick = !quick; McrawFolder17u.setQuick(ctx, quick) }, Modifier.testTag("mcraw:quick"),
+            help = "Quick import" to Help17uText.QUICK)
     }
     var outKey by remember { mutableStateOf(McrawFolder17u.out(ctx)) }
     val outs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }

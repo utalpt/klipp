@@ -235,7 +235,9 @@ class ProjectController(
                         if (first != null && first.width > 0) {
                             // (the rate the frames are at, measured from the file: a file can state another – see MediaProbe.rateOf)
                             val measured = withContext(kotlinx.coroutines.Dispatchers.IO) { uris[first.id]?.let { MediaProbe.probe(context, it)?.fps } }
-                            p.put("width", first.width).put("height", first.height).put("fps", seqFps ?: firstFps(measured ?: first.fps, uris[first.id]))
+                            // Klipp Lab: a MotionCam quick develop is half size – the project gets the full develop's size
+                            val k = if (McrawStore17u.isDraft(context, uris[first.id])) 2 else 1
+                            p.put("width", first.width * k).put("height", first.height * k).put("fps", seqFps ?: firstFps(measured ?: first.fps, uris[first.id]))
                         } else seqFps?.let { p.put("fps", it) }
                         engine.exec("file.newSequence", p)
                     }
@@ -810,6 +812,8 @@ class ProjectController(
         SourceSizes.remember(snap.media.mapNotNull { m -> uris[m.id]?.let { it to m } })
         // heavy files (4K, high frame rate, HDR) get proxy files in the background
         runCatching { Proxies.ensure(context, snap.media.mapNotNull { m -> uris[m.id]?.let { it to m } }) }
+        // Klipp Lab: MotionCam quick develops get their full develop in the background
+        runCatching { McrawStore17u.finishDrafts(context, snap.media.mapNotNull { m -> uris[m.id] }) }
         scope.launch { runCatching { Perf.prefetchHdr(context, snap.media.filter { it.hasVideo }.mapNotNull { uris[it.id] }) } }
         probeMedia(snap)
     }
