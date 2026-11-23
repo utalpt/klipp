@@ -142,6 +142,57 @@
    "notes": "OpenDRT.dctl says 'License: GPLv3' (the repository's LICENSE is the GPL v3 text). That wording alone doesn't settle version 3 only vs 'or later'; Klipp uses it under version 3, which it permits either way."
   },
   {
+   "id": "motioncam-decoder",
+   "component": "motioncam-decoder (MotionCam's .mcraw decoder library)",
+   "version": "commit b931ec0",
+   "kind": "fetched-source",
+   "category": "code",
+   "origin": "https://github.com/mirsadm/motioncam-decoder",
+   "license": "Apache-2.0",
+   "copyright": "© 2023 MotionCam",
+   "notices": [
+    "LICENSES/third-party/motioncam-decoder/LICENSE"
+   ],
+   "changes": "None. Klipp Lab builds only lib/Decoder.cpp, RawData.cpp and RawData_Legacy.cpp (fetched by app/src/main/cpp/CMakeLists.txt), with its own JNI layer (mcraw_jni.cpp).",
+   "included_in": "lib/arm64-v8a/libklipp_mcraw.so",
+   "status": "verified",
+   "notes": "Klipp Lab only (reading MotionCam .mcraw files)."
+  },
+  {
+   "id": "nlohmann-json",
+   "component": "JSON for Modern C++ (nlohmann/json, header-only)",
+   "version": "3.11.3 (as in motioncam-decoder b931ec0)",
+   "kind": "fetched-source",
+   "category": "code",
+   "origin": "https://github.com/nlohmann/json",
+   "license": "MIT",
+   "copyright": "© 2013-2023 Niels Lohmann",
+   "notices": [
+    "LICENSES/third-party/motioncam-decoder/nlohmann-json-LICENSE.txt"
+   ],
+   "changes": "None.",
+   "included_in": "lib/arm64-v8a/libklipp_mcraw.so",
+   "status": "verified",
+   "notes": "Part of motioncam-decoder's thirdparty folder."
+  },
+  {
+   "id": "simde",
+   "component": "SIMDe - SIMD Everywhere (header-only, x86 SSE2/SSE4.1 on ARM)",
+   "version": "as in motioncam-decoder b931ec0",
+   "kind": "fetched-source",
+   "category": "code",
+   "origin": "https://github.com/simd-everywhere/simde",
+   "license": "MIT",
+   "copyright": "© 2015-2023 Evan Nemerson and the SIMDe contributors (listed in the notice)",
+   "notices": [
+    "LICENSES/third-party/motioncam-decoder/simde-LICENSE.txt"
+   ],
+   "changes": "None.",
+   "included_in": "lib/arm64-v8a/libklipp_mcraw.so",
+   "status": "verified",
+   "notes": "Part of motioncam-decoder's thirdparty folder."
+  },
+  {
    "id": "filmcraft-fonts",
    "component": "FilmCraft engine fonts: Inter (Regular, Medium, SemiBold, Bold, Italic), JetBrains Mono Regular, Noto Serif Regular",
    "version": "FilmCraft 72831a4 (Inter 4.1)",

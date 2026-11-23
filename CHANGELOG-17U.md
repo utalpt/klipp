@@ -76,6 +76,9 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- Licenses: motioncam-decoder (Apache-2.0) and the two MIT header libraries it brings, JSON for Modern C++ and SIMDe,
+  now in Settings → About → Licenses with their license texts (LICENSES/third-party/motioncam-decoder), in
+  THIRD_PARTY.md and in the README's credits.
 - Storage page: its total says "Klipp Lab uses …" (as the warning), not "Klipp uses".
 - Settings → Storage, a page of its own: the space Klipp Lab uses, a row with Clear for each kind (MotionCam
   develops, proxies, node cache, renders), Clear caches (proxies, node cache and renders at once, after asking) and the

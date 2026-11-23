@@ -60,6 +60,7 @@ Everything the fork changes, entry by entry: [CHANGELOG-17U.md](CHANGELOG-17U.md
 https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
 
 🙏 Credits: Klipp by Flabbjaxaren. OpenDRT by Jed Smith. EI relation and slow-mo idea from George Kiarie's RawViewer.
+MotionCam RAW read with MotionCam's own decoder library, motioncam-decoder (Apache-2.0).
 Dolby Vision approach from Dolby's [dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor)
 sample (BSD-3-Clause-Clear).
 
@@ -213,6 +214,9 @@ Parts from other projects:
   `app/src/main/assets/spektrafilm/SPEKTRAFILM_LICENSE.txt`. The spectral upsampling tables behind the film tables are
   Klipp's own (`tools/spectra`, after Jakob & Hanika 2019).
 - **OpenDRT** (Jed Smith, https://github.com/jedypod/open-display-transform) – GPL-3.0, in `engine/OpenDrt.kt`.
+- **motioncam-decoder** (MotionCam, https://github.com/mirsadm/motioncam-decoder) – Apache-2.0, fetched at a pinned commit
+  and built into `libklipp_mcraw.so` (Klipp Lab, reading .mcraw), with the MIT-licensed JSON for Modern C++ and SIMDe
+  headers it includes.
 - **FilmCraft** (the editing engine, Rust), **Media3** (Apache-2.0), **whisper.cpp** (MIT).
 - **Media3 effect** (Apache-2.0) as source code in `third_party/media3-effect`, modified so that the whole video chain
   computes in floating point (RGBA16F) – see `third_party/media3-effect/KLIPP.md`.
