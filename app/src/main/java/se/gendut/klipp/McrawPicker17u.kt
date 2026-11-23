@@ -95,7 +95,7 @@ object McrawFolder17u {
 }
 
 @Composable
-fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
+fun ColumnScope.McrawPanel17u(picked: List<Uri>, onList: (List<Uri>) -> Unit = {}, onToggle: (Uri) -> Unit) {
     val ctx = LocalContext.current
     var tree by remember { mutableStateOf(McrawFolder17u.tree(ctx)) }
     var ei by remember { mutableIntStateOf(McrawFolder17u.ei(ctx)) }
@@ -125,6 +125,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onToggle: (Uri) -> Unit) {
     }
     val files by produceState<List<McrawFolder17u.File>?>(null, tree) { value = withContext(Dispatchers.IO) { McrawFolder17u.list(ctx) } }
     val list = files
+    LaunchedEffect(list) { onList(list.orEmpty().map { it.uri }) }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(tree?.lastPathSegment?.substringAfterLast(':')?.ifEmpty { null } ?: "MotionCam", color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.weight(1f))
         FlatTextButton(onClick = { pickFolder.launch(startAt) }) { Text("Other folder", fontSize = 12.sp) }

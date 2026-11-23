@@ -76,6 +76,8 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- Video picker: Select all – picks every video shown that isn't picked yet (the folder in view, or the MotionCam RAW
+  list), oldest first, so they go on the timeline in the order they were shot. Beside Clear and Import.
 - README credits: links to Klipp, FilmCraft, spektrafilm, OpenDRT and motioncam-decoder, the MIT headers it brings, the
   deleted-clip HLG fix (Klipp's 2797f03 by Flabbjaxaren), and the published methods the fork's own code follows
   (Malvar–He–Cutler demosaic, Kim et al.'s Planckian locus fit, ITU-R BT.2100 / BT.2408).

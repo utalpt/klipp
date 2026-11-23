@@ -333,6 +333,7 @@
     <string name="videopicker17u_allow">Ge åtkomst</string>
     <string name="videopicker17u_none">Inga videor hittades på telefonen.</string>
     <string name="videopicker17u_clear">Rensa</string>
+    <string name="videopicker17u_select_all">Markera alla</string>
     <string name="videopicker17u_partial">Bara de videor du valde visas.</string>
     <string name="videopicker17u_choose">Välj videor</string>
     <string name="videopicker17u_none_chosen">Inga videor valda ännu: tryck på Välj videor.</string>

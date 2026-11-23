@@ -32,7 +32,8 @@
   feedback welcome.)*
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
-- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
+- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names; Select all
+  picks every video shown (a folder or the MotionCam RAW list), oldest first.
 - 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
   the system again before sending you to the settings. *(Sent to Klipp too: in Klipp 0.21.0-beta.2.)*
 - ➕ **Add to the timeline** in the order selected, or straight on import.

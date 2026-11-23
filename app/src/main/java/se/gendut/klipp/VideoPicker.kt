@@ -134,6 +134,7 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
     var folder by remember { mutableStateOf<String?>(null) }
     // picked, in the order they were picked
     var picked by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var mcrawShown by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     // (the empty pointer input keeps touches on the page's bare parts from reaching the editor under it)
     Column(Modifier.fillMaxSize().background(K.Bg).pointerInput(Unit) {}.safeArea17u().testTag("videoPicker")) {
@@ -150,6 +151,8 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
                 modifier = Modifier.padding(start = 8.dp).testTag("videoPicker:choose"))
         }
         val list = videos
+        // Klipp Lab: what "Select all" picks – the videos shown (this folder, or the MotionCam RAW list)
+        var selectable: List<Uri> = emptyList()
         when {
             // Klipp Lab: MotionCam RAW (its own folder, developed into the chosen log on import)
             folder == MCRAW_FOLDER -> {
@@ -158,7 +161,8 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
                     item { ToggleChip("MotionCam RAW", true, {}) }
                 }
                 Spacer(Modifier.height(4.dp))
-                McrawPanel17u(picked) { u -> haptics.tick(); picked = if (u in picked) picked - u else picked + u }
+                McrawPanel17u(picked, onList = { mcrawShown = it }) { u -> haptics.tick(); picked = if (u in picked) picked - u else picked + u }
+                selectable = mcrawShown
             }
             !access -> Column(Modifier.fillMaxWidth().weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.videopicker17u_access), color = K.OnSurfaceVar, fontSize = 15.sp)
@@ -181,6 +185,7 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
                 }
                 Spacer(Modifier.height(8.dp))
                 val shown = if (folder == null) list else list.filter { it.folder == folder }
+                selectable = shown.map { it.uri }
                 LazyVerticalGrid(
                     GridCells.Adaptive(150.dp), Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -195,10 +200,20 @@ fun VideoPickerScreen(onImport: (List<Uri>) -> Unit, onFilesApp: () -> Unit, onC
                 }
             }
         }
-        if (picked.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            PillButton(stringResource(R.string.videopicker17u_clear), { picked = emptyList() }, filled = false)
-            Spacer(Modifier.size(10.dp))
-            PillButton(stringResource(R.string.videopicker17u_import, picked.size), { haptics.confirm(); onImport(picked) }, filled = true, on = true,
+        // Klipp Lab: Select all adds every video shown that isn't picked yet, oldest first (the list is newest first),
+        // so the timeline gets them in the order they were shot
+        val rest = selectable.filter { it !in picked }
+        if (picked.isNotEmpty() || rest.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (picked.isNotEmpty()) {
+                PillButton(stringResource(R.string.videopicker17u_clear), { picked = emptyList() }, filled = false)
+                Spacer(Modifier.size(10.dp))
+            }
+            if (rest.isNotEmpty()) {
+                PillButton(stringResource(R.string.videopicker17u_select_all), { haptics.tick(); picked = picked + rest.reversed() }, filled = false,
+                    modifier = Modifier.testTag("videoPicker:selectAll"))
+                Spacer(Modifier.size(10.dp))
+            }
+            if (picked.isNotEmpty()) PillButton(stringResource(R.string.videopicker17u_import, picked.size), { haptics.confirm(); onImport(picked) }, filled = true, on = true,
                 modifier = Modifier.weight(1f).testTag("videoPicker:import"))
         }
     }
