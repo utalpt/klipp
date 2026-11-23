@@ -176,16 +176,23 @@ object McrawConvert {
 
             val tStart = System.nanoTime()
             line("before the frames: ${ms(tStart - tCall)} ms (open, picture height, EI, colour, output file)")
-            // the sound: AAC, encoded first (it is small), written once the muxer starts
-            val sound = runCatching { encodeAudio(h, info.optInt("audioRate"), info.optInt("audioChannels"), t0ns) }
-                .onFailure { line("sound: failed – $it") }.getOrNull()
-            if (sound != null) line("sound: ${sound.samples.size} AAC frames, starts at ${"%.3f".format(sound.offsetUs / 1e6)} s")
-            line("sound encoded in ${ms(System.nanoTime() - tStart)} ms")
+            // the sound: AAC, encoded on its own thread while the frames are developed (it took 2-4 s before them).
+            // The muxer needs its format to start, which the encoder gives at once; the samples are written at the end.
+            val soundFormat = java.util.concurrent.CompletableFuture<MediaFormat?>()
+            var sound: Sound? = null
+            var soundMs = 0L
+            val soundThread = Thread {
+                val ts = System.nanoTime()
+                sound = runCatching { encodeAudio(h, info.optInt("audioRate"), info.optInt("audioChannels"), t0ns) { soundFormat.complete(it) } }
+                    .onFailure { line("sound: failed – $it") }.getOrNull()
+                soundFormat.complete(null)
+                soundMs = (System.nanoTime() - ts) / 1_000_000
+            }.apply { this.name = "mcraw-sound"; start() }
             // Klipp Lab: where the time goes, per stage (for optimizing): decode on the reader thread; on this one the
             // wait for a decoded frame, the upload and draw (texture upload is a CPU copy), the swap (blocks when the
             // encoder has no free input buffer or the GPU is behind) and the drain to the muxer
             val tDecode = java.util.concurrent.atomic.AtomicLong(0)
-            var tWait = 0L; var tDraw = 0L; var tSwap = 0L; var tDrain = 0L
+            var tWait = 0L; var tDraw = 0L; var tSwap = 0L; var tDrain = 0L; var uploadNs = 0L
             val bytes = w * hh * 2
             // decoded frames, in order, from a second thread (three buffers in flight)
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
@@ -234,6 +241,7 @@ object McrawConvert {
                 codec.start()
                 val muxer = MediaMuxer(outPfd.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
                 var track = -1
+                var audioTrack = -1
                 val info2 = MediaCodec.BufferInfo()
                 fun drain(end: Boolean) {
                     while (true) {
@@ -242,9 +250,8 @@ object McrawConvert {
                             i == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!end) return
                             i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                                 track = muxer.addTrack(codec.outputFormat)
-                                val at = sound?.let { muxer.addTrack(it.format) }
+                                audioTrack = runCatching { soundFormat.get(10, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull()?.let { muxer.addTrack(it) } ?: -1
                                 muxer.start()
-                                if (sound != null && at != null) for ((data, bi) in sound.samples) muxer.writeSampleData(at, ByteBuffer.wrap(data), bi)
                             }
                             i >= 0 -> {
                                 val ob = codec.getOutputBuffer(i)!!
@@ -276,23 +283,30 @@ object McrawConvert {
                         tDrain += System.nanoTime() - t
                         if (k % 4 == 0) progress(k / n.toFloat())
                     }
-                } finally { gl.release() }
+                } finally { uploadNs = gl.tUpload; gl.release() }
                 val tEnd = System.nanoTime()
                 codec.signalEndOfInputStream()
                 drain(true)
                 line("end of stream: ${ms(System.nanoTime() - tEnd)} ms")
                 codec.stop(); codec.release()
+                val tJoin = System.nanoTime()
+                soundThread.join()
+                line("sound: encoded in $soundMs ms beside the frames (waited ${ms(System.nanoTime() - tJoin)} ms at the end)")
+                val snd = sound
+                if (snd != null) line("sound: ${snd.samples.size} AAC frames, starts at ${"%.3f".format(snd.offsetUs / 1e6)} s")
+                if (snd != null && audioTrack >= 0 && track >= 0) for ((data, bi) in snd.samples) muxer.writeSampleData(audioTrack, ByteBuffer.wrap(data), bi)
                 if (track >= 0) muxer.stop()
                 muxer.release()
             } finally {
                 stop.set(true)
                 reader.interrupt(); reader.join(2000)
+                soundThread.join(30_000) // it reads the file's handle, closed after this
                 outPfd.close()
             }
             val secs = (System.nanoTime() - tStart) / 1e9
             val per = encoded.coerceAtLeast(1) * 1e6
             line("per frame (ms): decode ${"%.1f".format(tDecode.get() / per)} (reader thread) · wait ${"%.1f".format(tWait / per)} · " +
-                "upload+draw ${"%.1f".format(tDraw / per)} · swap ${"%.1f".format(tSwap / per)} · drain ${"%.1f".format(tDrain / per)}")
+                "upload+draw ${"%.1f".format(tDraw / per)} (upload ${"%.1f".format(uploadNs / per)}) · swap ${"%.1f".format(tSwap / per)} · drain ${"%.1f".format(tDrain / per)}")
             line("total with the steps before: ${"%.1f".format((System.nanoTime() - tCall) / 1e9)} s")
             if (part != null) { if (!part.renameTo(outFile!!)) error("could not write ${outFile.name}") }
             else ctx.contentResolver.update(outUri!!, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null)
@@ -333,7 +347,7 @@ object McrawConvert {
      * first frame is left out; when the clocks don't match (more than 2 s apart) it starts with the picture. Null when
      * the file has none.
      */
-    private fun encodeAudio(h: Long, rate: Int, channels: Int, t0ns: Long): Sound? {
+    private fun encodeAudio(h: Long, rate: Int, channels: Int, t0ns: Long, onFormat: (MediaFormat) -> Unit = {}): Sound? {
         if (rate <= 0 || channels <= 0) return null
         val (pcm, startNs) = Mcraw.audio(h) ?: return null
         var offsetUs = (startNs - t0ns) / 1000
@@ -372,7 +386,7 @@ object McrawConvert {
                     }
                 }
                 val oi = codec.dequeueOutputBuffer(bi, 10_000)
-                if (oi == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) outFormat = codec.outputFormat
+                if (oi == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) { outFormat = codec.outputFormat; onFormat(codec.outputFormat) }
                 else if (oi >= 0) {
                     if (bi.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && bi.size > 0) {
                         val ob = codec.getOutputBuffer(oi)!!
@@ -480,12 +494,17 @@ object McrawConvert {
         val context: EGLContext
         val eglSurface: EGLSurface
         var program = 0
-        var rawTex = 0
-        var shadeTex = 0
+        // Klipp Lab: three raw and shading textures in turn, so a frame's upload doesn't wait for the GPU to finish
+        // drawing the one before from the same texture
+        val rawTexs = IntArray(3)
+        val shadeTexs = IntArray(3)
+        val shadeWs = IntArray(3); val shadeHs = IntArray(3)
+        var slot = 0
+        /** Time spent in the raw upload (glTexSubImage2D, a CPU copy), for the log. */
+        var tUpload = 0L
         var curveTex = 0
         /** Camera white balance over as shot ([cameraWb]). */
         var wbCam = floatArrayOf(1f, 1f, 1f)
-        var shadeW = 0; var shadeH = 0
         // the CFA: colour (0 R, 1 G, 2 B) and shading-map channel (0 R, 1 G even, 2 G odd, 3 B) at each 2×2 position
         val colorAt = IntArray(4); val shadeAt = IntArray(4)
 
@@ -512,11 +531,13 @@ object McrawConvert {
             }
             program = link(VS, FS)
             GLES30.glUseProgram(program)
-            val t = IntArray(2); GLES30.glGenTextures(2, t, 0)
-            rawTex = t[0]; shadeTex = t[1]
-            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, rawTex)
-            GLES30.glTexStorage2D(GLES30.GL_TEXTURE_2D, 1, GLES30.GL_R16UI, w, h)
-            nearest()
+            GLES30.glGenTextures(3, rawTexs, 0); GLES30.glGenTextures(3, shadeTexs, 0)
+            // only the picture's rows are uploaded (the padding below it is never read: the shader clamps to [size])
+            for (t in rawTexs) {
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, t)
+                GLES30.glTexStorage2D(GLES30.GL_TEXTURE_2D, 1, GLES30.GL_R16UI, w, ch)
+                nearest()
+            }
             GLES30.glUniform1i(loc("raw"), 0)
             GLES30.glUniform1i(loc("shade"), 1)
             GLES30.glUniform4i(loc("colorAt"), colorAt[0], colorAt[1], colorAt[2], colorAt[3])
@@ -557,11 +578,14 @@ object McrawConvert {
         private fun loc(n: String) = GLES30.glGetUniformLocation(program, n)
 
         fun drawFrame(buf: ByteBuffer, meta: JSONObject, c: JSONObject) {
+            slot = (slot + 1) % 3
             GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, rawTex)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, rawTexs[slot])
             buf.position(0)
             GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 2)
-            GLES30.glTexSubImage2D(GLES30.GL_TEXTURE_2D, 0, 0, 0, w, h, GLES30.GL_RED_INTEGER, GLES30.GL_UNSIGNED_SHORT, buf)
+            val tu = System.nanoTime()
+            GLES30.glTexSubImage2D(GLES30.GL_TEXTURE_2D, 0, 0, 0, w, ch, GLES30.GL_RED_INTEGER, GLES30.GL_UNSIGNED_SHORT, buf)
+            tUpload += System.nanoTime() - tu
 
             // levels: the frame's own black and white when it has them
             val black = meta.optJSONArray("dynamicBlackLevel") ?: c.optJSONArray("blackLevel") ?: JSONArray(listOf(0, 0, 0, 0))
@@ -588,10 +612,10 @@ object McrawConvert {
                 for (i in 0 until sw * sh) for (ch in 0 until 4) data.put(lsm.getJSONArray(ch).optDouble(i, 1.0).toFloat())
                 data.position(0)
                 GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
-                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, shadeTex)
-                if (sw != shadeW || sh != shadeH) {
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, shadeTexs[slot])
+                if (sw != shadeWs[slot] || sh != shadeHs[slot]) {
                     GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA32F, sw, sh, 0, GLES30.GL_RGBA, GLES30.GL_FLOAT, null)
-                    nearest(); shadeW = sw; shadeH = sh
+                    nearest(); shadeWs[slot] = sw; shadeHs[slot] = sh
                 }
                 GLES30.glTexSubImage2D(GLES30.GL_TEXTURE_2D, 0, 0, 0, sw, sh, GLES30.GL_RGBA, GLES30.GL_FLOAT, data)
                 GLES30.glUniform1i(loc("useShade"), 1)
