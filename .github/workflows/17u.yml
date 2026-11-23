@@ -3,7 +3,8 @@ name: Klipp Lab
 # The fork's build (utalpt/klipp), as in Rawr 17U:
 # - a push to xiaomi-17u builds the APK, runs the fork's tests and republishes the `debug` prerelease, so its link stays
 #   fixed: https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
-# - a push to a test branch (hlg, …) only keeps the run's artifact. [skip tests] in the commit message only builds.
+# - a push to a test branch (hlg, …) only keeps the run's artifact; on test/ branches the unit tests run only with
+#   [tests] in the commit message. [skip tests] in the commit message only builds.
 # - an annotated tag v<Klipp's version>-17u.<N> (e.g. v0.21.0-beta.1-17u.1) publishes the signed release: the tag's
 #   message is the "What's new" (else the version's section of CHANGELOG-17U.md), then .github/release-footer.md.
 # Signed with the release key from the repository's secrets whenever it is there, so every CI APK installs over the
@@ -67,8 +68,11 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
           RUSTFLAGS="--remap-path-prefix=$HOME=~" cargo ndk -t arm64-v8a --platform 29 -o ../app/src/main/jniLibs build --release
-      # Gradle's dependencies, wrapper and build cache are kept between runs (written on the default branch)
+      # Gradle's dependencies, wrapper and build cache are kept between runs - written by every branch's runs, test
+      # branches included (by default only the default branch writes, so each test build started from an old cache)
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: false
       # compiler cache for whisper.cpp (CMake): Gradle's build cache doesn't keep native builds, unchanged files aren't
       # rebuilt (as in Rawr 17U)
       - uses: hendrikmuhs/ccache-action@v1.2
@@ -139,7 +143,9 @@ jobs:
             --title "Test build" --notes "CI build of ${GITHUB_SHA} (${{ steps.ver.outputs.version }}), branch ${GITHUB_REF_NAME}."
       # the tests on debug: the Compose test rule needs debug's test activity (ui-test-manifest is debug only)
       - name: Unit tests (OpenDRT, export plan)
-        if: ${{ !(github.event.inputs.skip_tests == 'true' || contains(github.event.head_commit.message, '[skip tests]')) || startsWith(github.ref, 'refs/tags/') }}
+        # (on a test/ branch only with [tests] in the commit message: they compile the whole app again for debug, ~3 min,
+        # and check OpenDRT and the export plan, rarely touched; xiaomi-17u and the tags always run them)
+        if: ${{ startsWith(github.ref, 'refs/tags/') || (!(github.event.inputs.skip_tests == 'true' || contains(github.event.head_commit.message, '[skip tests]')) && (!startsWith(github.ref, 'refs/heads/test/') || contains(github.event.head_commit.message, '[tests]'))) }}
         run: ./gradlew --build-cache testDebugUnitTest --tests 'se.gendut.klipp.OpenDrtTest' --tests 'se.gendut.klipp.ExportPlanTest'
       - uses: actions/upload-artifact@v7
         if: ${{ failure() && !github.event.repository.private }}

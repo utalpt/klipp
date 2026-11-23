@@ -13,6 +13,21 @@ and any footage.
 
 Built and tested on the test branch; goes into the next release.
 
+RAW import
+- MotionCam RAW and DNG folders go on the timeline at once: each clip as a placeholder (its middle frame, its length,
+  silent sound) while it develops, replaced by the develop when ready - the editor and the next import are usable from
+  the first second instead of after the develops.
+- RAW EI is live: the EI buttons in a MotionCam / DNG clip's RAW settings show at once (a rating on the develop, as a
+  cinema camera's EI on S-Log3); Develop puts it into the file from the RAW.
+- Pasting a grade (Paste, the wheels' Paste, All video clips in) brings the EI with it, live on every RAW clip at once;
+  behind, each clip is developed again from the RAW at that EI and output, one after another, and switches when done.
+- Render waits for the RAW develops still running (a pasted EI, quick develops' full ones) and renders the developed
+  files: one tap finishes everything. The develop queue shows in the status strip, now lower: clear of the Edit /
+  Color / Audio buttons, and it never takes a touch.
+- A project started from RAW clips gets the full develop's size (4096×2560), not the quick one's (2048×1280).
+- Color page: the picture moves to the clip being graded when the playhead is on another one (a clip selected on the
+  Edit page showed the other clip, and its changes seemed not to apply).
+
 Color and export
 - LUT browser: in a node's LUT tab, one strip of cards, each showing the current frame graded with that LUT, grouped
   by pack (the group's name above its first card); opens at the LUT in use.
@@ -76,6 +91,22 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- The grip under the transport (picture height) and the landscape split grip work again after a project of another
+  shape: they kept writing to the first shape's height and did nothing. A slightly taller grip, easier to catch.
+- DNG folders as RAW clips: a folder of DNG frames - PhotonCamera's raw video ("DNG (folder)": the frames in a hidden
+  .dng folder, the sound beside them as RAW_MIC.flac) and CinemaDNG folders - shows in the MotionCam RAW chip's list
+  (as "DNG", with a preview) and is developed on the GPU like MotionCam RAW: Quick import, proxies, RAW settings. The
+  frames are read by the app's own DNG reader (dng17u_jni.cpp, after Adobe's DNG specification): CFA images in IFD 0
+  or a SubIFD, strips or tiles, 8-16 bits a sample, uncompressed; the colour data and the lens shading maps (GainMap
+  opcodes) go to the develop. Frames come in their names' number order; a dropped frame repeats the one before it, so
+  the clip keeps its length and the sound stays in sync. The rate is the files' FrameRate tag. Not yet: lossless JPEG
+  DNGs and Linear DNGs (Apple ProRAW). PhotonCamera's .mcraw also works as it is (tested). A
+  VID_… folder picked as the folder itself is listed as the clip, with its sound (not its hidden .dng folder alone).
+  A folder with frames the camera dropped says so at import ("102 of 379 frames missing in the recording"): it plays in
+  jerks, from the recording (PhotonCamera drops many frames writing 4K DNGs, at 60 fps and even at 30); its .mcraw
+  doesn't. PhotonCamera's Downscale 4x DNGs still look off (their levels don't match their samples, and the frame has empty rows
+  below): use its .mcraw.
+- Export screen: "10-bit" in the line of what is made when the output follows 10-bit sources.
 - Export screen redone: the file's name and what is being made (size, frame rate, codec, SDR/HLG/Dolby Vision), a ring
   that fills with the export with the percentage large in its middle, and the time spent, the time left (from the pace
   so far) and the speed in frames per second.

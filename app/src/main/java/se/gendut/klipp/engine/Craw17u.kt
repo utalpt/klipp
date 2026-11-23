@@ -21,8 +21,12 @@ internal interface RawLib {
     fun audio(h: Long): Pair<ShortArray, Long>?
 
     companion object {
-        /** By the file's name: .craw is Cinematic RAW, anything else MotionCam. */
-        fun of(ctx: Context, uri: Uri): RawLib = if (isCraw(ctx, uri)) Craw17u else McrawLib
+        /** A folder is a DNG sequence; by the file's name: .craw is Cinematic RAW, anything else MotionCam. */
+        fun of(ctx: Context, uri: Uri): RawLib = when {
+            DngSeq17u.isSeq(ctx, uri) -> DngSeq17u
+            isCraw(ctx, uri) -> Craw17u
+            else -> McrawLib
+        }
 
         fun isCraw(ctx: Context, uri: Uri): Boolean {
             val name = runCatching {
@@ -32,6 +36,20 @@ internal interface RawLib {
             return name.endsWith(".craw", ignoreCase = true)
         }
     }
+}
+
+/** An open RAW source: its handle, closed with the file it came from. */
+internal class RawSource(val lib: RawLib, val h: Long, private val pfd: android.os.ParcelFileDescriptor?) : AutoCloseable {
+    override fun close() { runCatching { lib.close(h) }; runCatching { pfd?.close() } }
+}
+
+/** Opens [uri] with this library (a file by its descriptor, a DNG folder by its frames); null when it can't be read. */
+internal fun RawLib.openSource(ctx: Context, uri: Uri): RawSource? {
+    if (this === DngSeq17u) return DngSeq17u.openSeq(ctx, uri).takeIf { it != 0L }?.let { RawSource(this, it, null) }
+    val pfd = runCatching { ctx.contentResolver.openFileDescriptor(uri, "r") }.getOrNull() ?: return null
+    val h = open(pfd.fd)
+    if (h == 0L) { pfd.close(); return null }
+    return RawSource(this, h, pfd)
 }
 
 internal object McrawLib : RawLib {

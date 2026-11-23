@@ -47,9 +47,8 @@ object McrawConvert {
     fun autoEi(ctx: Context, src: Uri): Int? {
         val lib = RawLib.of(ctx, src)
         if (!lib.available) return null
-        val pfd = runCatching { ctx.contentResolver.openFileDescriptor(src, "r") }.getOrNull() ?: return null
-        val h = lib.open(pfd.fd)
-        if (h == 0L) { pfd.close(); return null }
+        val source = lib.openSource(ctx, src) ?: return null
+        val h = source.h
         try {
             val info = JSONObject(lib.info(h))
             val c = info.getJSONObject("container")
@@ -86,7 +85,7 @@ object McrawConvert {
         } catch (e: Throwable) {
             return null
         } finally {
-            lib.close(h); pfd.close()
+            source.close()
         }
     }
 
@@ -128,9 +127,8 @@ object McrawConvert {
         val name = runCatching {
             ctx.contentResolver.query(src, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull() ?: "mcraw"
-        val pfd = ctx.contentResolver.openFileDescriptor(src, "r") ?: return Result(null, "Could not open the file", "")
-        val h = lib.open(pfd.fd)
-        if (h == 0L) { pfd.close(); return Result(null, "Not a RAW video file (MCRAW or CRAW)", "") }
+        val source = lib.openSource(ctx, src) ?: return Result(null, "Could not open it as RAW video (MCRAW, CRAW or a DNG folder)", "")
+        val h = source.h
         var outUri: Uri? = null
         try {
             val info = JSONObject(lib.info(h))
@@ -142,6 +140,7 @@ object McrawConvert {
             val t0ns = frames.getLong(0)
             val fps = if (n > 1) (n - 1) / ((frames.getLong(n - 1) - t0ns) / 1e9) else 30.0
             line("convert: $name  ${w}x$hh  $n frames  ${"%.3f".format(fps)} fps")
+            info.optJSONObject("dng")?.let { d -> line("DNG folder: ${d.optInt("missing")} of $n frames missing in the recording (repeated), ${d.optInt("bits")}-bit, ${d.optDouble("frameRate")} fps tag") }
 
             // MotionCam pads the frame's buffer below the picture (4096×3072 holding a 4096×2560 picture): those rows,
             // all at the black level with no noise, are left out – the clip is the picture's own height
@@ -213,7 +212,7 @@ object McrawConvert {
             // One decode thread was the limit (13 ms a frame, 21-27 ms with other work running). Buffers: each thread
             // holds at most one queued and one being decoded, plus the one being drawn.
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
-            val READERS = readerCount(draft, lib === Craw17u)
+            val READERS = readerCount(draft, lib === Craw17u || lib === DngSeq17u)
             val nBuf = READERS * 2 + 1
             val free = ArrayBlockingQueue<ByteBuffer>(nBuf).apply { repeat(nBuf) { add(ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN)) } }
             val readyQ = List(READERS) { ArrayBlockingQueue<Frame>(1) }
@@ -221,8 +220,8 @@ object McrawConvert {
             val readers = List(READERS) { t ->
                 Thread {
                     runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND) }
-                    val rp = ctx.contentResolver.openFileDescriptor(src, "r")
-                    val rh = rp?.let { lib.open(it.fd) } ?: 0L
+                    val rs = lib.openSource(ctx, src)
+                    val rh = rs?.h ?: 0L
                     try {
                         var i = t
                         while (i < n) {
@@ -237,7 +236,7 @@ object McrawConvert {
                     } catch (_: InterruptedException) {
                     } catch (e: Throwable) {
                         android.util.Log.e("KlippMcraw", "reader", e)
-                    } finally { if (rh != 0L) lib.close(rh); rp?.close() }
+                    } finally { rs?.close() }
                 }.apply { this.name = "mcraw-read-$t"; start() }
             }
 
@@ -347,7 +346,7 @@ object McrawConvert {
             else outUri?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             return Result(null, "Conversion failed: ${e.message}", log.toString())
         } finally {
-            lib.close(h); pfd.close()
+            source.close()
         }
     }
 
@@ -358,7 +357,7 @@ object McrawConvert {
      * side is the limit, ~15 ms a frame); three for the quick one, which waited for the decode (16 ms a frame each).
      */
     // (Klipp Lab: a .CRAW frame takes ~50 ms to decode, against MotionCam's ~20: its full develop waited 15 ms a frame
-    // for decoded frames on 2 readers, so it gets 3)
+    // for decoded frames on 2 readers, so it gets 3; a DNG frame - a 16 MB file read whole - too)
     private fun readerCount(draft: Boolean, craw: Boolean = false) = if (draft || craw) 3 else 2
 
     /**
@@ -434,7 +433,7 @@ object McrawConvert {
     }
 
     /** The encoder and size: HEVC Main10 with surface input, the file's size or the largest of the same shape. */
-    private fun pickSize(w: Int, h: Int, fps: Double): Triple<Int, Int, String>? {
+    internal fun pickSize(w: Int, h: Int, fps: Double): Triple<Int, Int, String>? {
         val infos = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { ci ->
             ci.isEncoder && ci.supportedTypes.any { it.equals(MediaFormat.MIMETYPE_VIDEO_HEVC, true) } && !ci.isSoftwareOnly &&
                 ci.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).profileLevels.any { it.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10 }

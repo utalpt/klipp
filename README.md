@@ -5,14 +5,15 @@
 > staying a general video editor. It runs on any Android 10+ phone (64-bit); built and tested
 > on a Xiaomi 17 Ultra. HLG export needs a 10-bit HDR HEVC encoder; the Dolby Vision options only show on phones
 > with a Dolby Vision encoder (the 17 Ultra has one; the 15 and 14 Ultra not checked yet). It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
-> Klipp as pull requests; issues with the fork's own features go here, not to Klipp.
+> Klipp as pull requests (seven are in Klipp 0.21.0-beta.2: #4–#10, marked below as "In Klipp too"); issues with the
+> fork's own features go here, not to Klipp.
 
 ## 🧪 What Klipp Lab adds
 
 - 🌈 **HLG export from the grade:** each clip's last OpenDRT node renders Rec.2100 HLG, 10-bit HEVC, tagged
   BT.2020 / HLG (Google Photos shows it as HDR). Ungraded clips, titles and captions are converted from SDR
-  (BT.2408, SDR white at 75 % HLG), and the export dialog shows what will actually be made. *(Both sent to Klipp too:
-  in Klipp 0.21.0-beta.2.)*
+  (BT.2408, SDR white at 75 % HLG), and the export dialog shows what will actually be made. *(In Klipp too since
+  0.21.0-beta.2: PR #6.)*
 - 🎥 **Dolby Vision export from the grade:** the same HLG encoded by the phone's Dolby Vision encoder as Profile 8.4
   (HLG compatible), the dynamic metadata made from the edited frames.
 - 🔁 **Dolby Vision in, Dolby Vision out:** Dolby Vision clips cut and edited come out as Dolby Vision 8.4 again
@@ -28,24 +29,35 @@
   develops each one (Quick import: half size first, the full develop in the background) into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
   with the camera's white balance. The RAW settings stay changeable afterwards, as in a raw developer: on the Color page
   pick another EI or log and Develop again (the clip is swapped in place, with a new proxy), and the clip's
-  Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. *(Early:
-  feedback welcome.)*
+  Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. The clips
+  go on the timeline at once, each as a placeholder (a still, its real length) until its develop takes its place - edit
+  or import more from the first second; a project started from them gets the full develop's size. **EI is live:** the
+  RAW settings' EI shows at once (a rating on the develop, as a cinema camera's EI on S-Log3) and Develop bakes it in;
+  a pasted grade (Paste, All video clips in) brings its EI to every RAW clip at once while each is developed again from
+  the RAW behind, and Render waits for those develops, then renders. *(Early: feedback welcome.)*
+- 🗂️ **DNG folders in** (early): a folder of DNG frames - PhotonCamera's raw video, CinemaDNG - listed in the MotionCam RAW chip
+  and developed on the GPU like MotionCam RAW, with its sound (FLAC/WAV beside the frames). The app's own DNG reader:
+  uncompressed CFA DNGs for now (no lossless JPEG or Linear/ProRAW yet).
 - 🎞️ **Cinematic RAW Studio (.CRAW) in** – by [matthew777777](https://github.com/matthew777777): .CRAW clips – from the video
   picker's Cinematic RAW chip (the folder the app records into, picked once) or Import → Files app – are developed into an editable log copy (with AAC sound), at the log and EI chosen in the dialog
   that opens, on the GPU (the same develop as MotionCam RAW, with Quick import and RAW settings; RGB-cell takes on the CPU); RAW settings, or **CRAW development** for a CPU develop, develop a clip again in place. Read with the app's own
   Apache-2.0 decoder (`third_party/craw`). Needs Android 12+ and a 10-bit HEVC encoder.
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
-- 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
-- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names; Select all
-  picks every video shown (a folder or the MotionCam RAW list), oldest first.
+- 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete *(in Klipp too since
+  0.21.0-beta.2: PR #5)*; Klipp Lab only: much faster import (a .zip of 33 LUTs in about 4 s, with progress).
+- 📤 **Export screen:** a progress ring with the file name, what is being made (size, rate, codec, SDR/HLG/HDR) and
+  elapsed / time left / speed; the edit page shows how many clips are on the timeline.
+- 🖼️ **Video picker** with previews (log clips included); clips keep their file names *(in Klipp too since
+  0.21.0-beta.2: PR #7)*. Klipp Lab only: it opens in DCIM/Camera, and Select all picks every video shown (a folder or
+  the MotionCam RAW list), oldest first.
 - 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
-  the system again before sending you to the settings. *(Sent to Klipp too: in Klipp 0.21.0-beta.2.)*
-- ➕ **Add to the timeline** in the order selected, or straight on import.
+  the system again before sending you to the settings. *(In Klipp too since 0.21.0-beta.2.)*
+- ➕ **Add to the timeline** in the order selected, or straight on import. *(In Klipp too since 0.21.0-beta.2: PR #8.)*
 - ⏱️ **Frame rates:** phone clips give a standard project rate (a 60 fps clip measured at 58.6 makes a 60 fps
   project), and the rate chosen for a new project is kept.
-- 🎨 Files without a colour transfer keep their matrix and range.
-- ✅ Select several projects and delete them at once.
-- 🔲 The selection box scrolls the timeline at the edges.
+- 🎨 Files without a colour transfer keep their matrix and range. *(In Klipp too since 0.21.0-beta.2: PR #4.)*
+- ✅ Select several projects and delete them at once. *(In Klipp too since 0.21.0-beta.2: PR #9.)*
+- 🔲 The selection box scrolls the timeline at the edges. *(In Klipp too since 0.21.0-beta.2: PR #10.)*
 - 🧲 **Close gaps:** hold a track's header → Close gaps, or Close gap beside Delete for a selected clip – the clip
   moves back to the one before it, linked clips follow.
 - 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – MotionCam develops,

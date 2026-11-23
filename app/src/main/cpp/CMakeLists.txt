@@ -66,3 +66,9 @@ target_compile_features(klipp_craw PRIVATE cxx_std_20)
 target_include_directories(klipp_craw PRIVATE ${CRAW_ROOT}/include ${CRAW_ROOT}/tools)
 target_compile_options(klipp_craw PRIVATE -O3 -fvisibility=hidden)
 target_link_options(klipp_craw PRIVATE -Wl,-z,max-page-size=16384)
+
+# Klipp Lab: DNG frames (a folder of DNGs as a RAW clip: PhotonCamera's raw video, CinemaDNG) – the app's own reader
+add_library(klipp_dng SHARED dng17u_jni.cpp)
+target_compile_features(klipp_dng PRIVATE cxx_std_20)
+target_compile_options(klipp_dng PRIVATE -O3 -fexceptions -fvisibility=hidden)
+target_link_options(klipp_dng PRIVATE -Wl,-z,max-page-size=16384)

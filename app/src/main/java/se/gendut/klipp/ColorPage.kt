@@ -226,10 +226,12 @@ class GradeState {
     /** Paste the copied grade onto [id] (onto the clip it was copied from: that clip's grade back, whole). */
     fun pasteGrade(id: Long): ClipGrade? {
         val cb = clipboard ?: return null
-        if (clipboardFrom == id) set(id, cb) else applyGrade(id, cb)
+        if (clipboardFrom == id) set(id, cb) else { applyGrade(id, cb); clipboardFrom?.let { from -> rawFollow?.invoke(from, listOf(id)) } }
         pasted.add(id)
         return of(id)
     }
+    /** Klipp Lab: a grade given from clip `from` to others: RAW clips among them get its develop too (set by the color page). */
+    var rawFollow: ((from: Long, to: Collection<Long>) -> Unit)? = null
     /** The program image as displayed (PixelCopy) – for scopes during playback. */
     var capture: (suspend () -> Bitmap?)? = null
 
@@ -377,6 +379,9 @@ fun ColorPage(
     var renaming by remember { mutableStateOf<GradeNode?>(null) }
     val ctx = LocalContext.current
     LaunchedEffect(Unit) { runCatching { StillStore.init(ctx) } }
+    // Klipp Lab: a pasted grade (or one given to all clips) brings the RAW develop with it - its EI and output - so the
+    // other RAW clips look the same without developing each by hand
+    gs.rawFollow = { from, to -> followRawDevelop17u(ctx, gs, clips, from, to) }
     // when leaving the color page: no color tools left on top of the program image
     androidx.compose.runtime.DisposableEffect(gs) {
         onDispose { gs.compare = null; gs.compareImage = null; gs.showKey = null; gs.pick = null; gs.windowEdit = null }
@@ -384,6 +389,11 @@ fun ColorPage(
     val g = current?.let { gs.shown(it.id) ?: ClipGrade() }
     val node = g?.let { cg -> cg.nodes.firstOrNull { it.id == nodeId } ?: cg.nodes.first() }
 
+    // Klipp Lab: the picture shows the clip being graded - a clip selected on the Edit page with the playhead on another
+    // clip kept showing that other clip, so the grade's changes seemed not to apply
+    androidx.compose.runtime.LaunchedEffect(current?.id) {
+        current?.let { c -> if (!state.playing && (state.playhead < c.start || state.playhead >= c.end)) state.playhead = (c.start + c.end) / 2 }
+    }
     Column(Modifier.fillMaxSize().testTag("colorPage")) {
         ClipStrip(clips, current?.id, gs) { c ->
             haptics.tick()
@@ -891,6 +901,7 @@ private fun ColorMore(
                         haptics.confirm()
                         val cg = gs.of(current.id)
                         gs.setAll(clips.filter { it.id != current.id }.associate { it.id to cg.forOtherClip(gs.of(it.id).stab, gs.of(it.id).layer, gs.of(it.id).mblur) })
+                        gs.rawFollow?.invoke(current.id, clips.filter { it.id != current.id }.map { it.id })
                     }
                     ActionTile(stringResource(R.string.colorpage_reset), Ic.Reset, Modifier.weight(1f).testTag("grade:reset"), danger = true) { haptics.heavy(); gs.set(current.id, gs.of(current.id).colorReset()); setNode(1) }
                     // (stabilization and motion blur are on the clip: Picture in the edit page)

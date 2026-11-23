@@ -48,6 +48,8 @@ object RenderCache {
 
     /** A render waits for a clip's proxy (see [proxyPending]): the render chip says so instead of 0 %. */
     var waitingForProxy by mutableStateOf(false)
+    /** Klipp Lab: a render waiting for RAW develops to finish (it renders the finished files, once). */
+    var waitingForDevelop by mutableStateOf(false)
         private set
 
     /** Diagnostics (test runs): playback builds its composition again, as when a chunk becomes ready – nothing is deleted. */
@@ -838,6 +840,15 @@ object RenderCache {
                 // the timeline changed: what is left is rendered with the new one
                 if (generation != gen) return Result.success(n)
                 if (isReady(c)) { done += c.b - c.a; continue }
+                // Klipp Lab: RAW clips still being developed (a pasted EI, quick develops' full ones): the render waits and
+                // renders the developed files - "Render" finishes everything (a chunk rendered from the old develop was
+                // rendered again after the switch)
+                while (McrawStore17u.busy) {
+                    waitingForDevelop = true
+                    if (generation != gen || c.hash !in wanted) { waitingForDevelop = false; return Result.success(n) }
+                    kotlinx.coroutines.delay(500)
+                }
+                waitingForDevelop = false
                 // a clip's proxy still being made: wait for it. Rendered from the original meanwhile the chunk decoded the
                 // camera file beside the proxy's transcode and the node caches (APV 4K on the vivo: "Codec exception", the
                 // decoder's instances taken) – and the chunk's key holds whether a proxy is used, so it was rendered again
@@ -848,6 +859,7 @@ object RenderCache {
                     kotlinx.coroutines.delay(500)
                 }
                 waitingForProxy = false
+            waitingForDevelop = false
                 current = c.a to c.b
                 currentDone = 0f
                 val built = CompositionBuilder.buildFull(

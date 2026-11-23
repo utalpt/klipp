@@ -400,6 +400,15 @@ private fun KlippAppContent(
             val range = when { st.dolby -> "Dolby Vision"; st.hlg -> "HLG"; st.hdr -> "HDR"; else -> "SDR" }
             listOfNotNull("${ow}×$oh".takeIf { ow > 0 }, "%.3f".format(outFps).trimEnd('0').trimEnd('.', ',') + " fps", "$codec${if (ten) " 10-bit" else ""}", range).joinToString(" · ")
         }
+        // ("same as the sources": 10-bit when a clip is – known after a look at the files, off the main thread)
+        if (st.bitDepth == 0 && !(st.hlg || st.dolby || st.hdr) && st.codec != androidx.media3.common.MimeTypes.VIDEO_H264) {
+            val before = se.gendut.klipp.engine.ExportJobs.summary
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                if (runCatching { se.gendut.klipp.engine.CompositionBuilder.anyTenBit(context, snap, uris) }.getOrDefault(false) &&
+                    se.gendut.klipp.engine.ExportJobs.summary == before)
+                    se.gendut.klipp.engine.ExportJobs.summary = before.replaceFirst(Regex("\\b(HEVC|AV1)\\b(?! 10-bit)"), "$1 10-bit")
+            }
+        }
         se.gendut.klipp.engine.ExportJobs.start(context, name) { ctx, onProgress ->
             se.gendut.klipp.engine.Exporter.export(ctx, snap, uris, name, look, master, grades, st, onProgress)
         }
@@ -1292,9 +1301,11 @@ private fun KlippAppContent(
         }
 
         // Klipp Lab: the MotionCam develops' progress, a strip that doesn't block: the clips already in can be edited
-        (mcrawProgress ?: se.gendut.klipp.engine.CrawImport.status ?: se.gendut.klipp.engine.LutStore.status)?.let { text ->
+        // (below the Edit / Color / Audio buttons with room to spare, and it takes no touches: what is under it stays usable;
+        // a develop queue - a pasted EI - shows here too)
+        (mcrawProgress ?: se.gendut.klipp.engine.McrawStore17u.working?.let { "Developing $it" } ?: se.gendut.klipp.engine.CrawImport.status ?: se.gendut.klipp.engine.LutStore.status)?.let { text ->
             Text(text, color = K.OnSurface, fontSize = 13.sp, maxLines = 2,
-                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 64.dp, start = 16.dp, end = 16.dp)
+                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 80.dp, start = 16.dp, end = 16.dp)
                     .clip(RoundedCornerShape(12.dp)).background(K.SurfaceHigh.copy(alpha = 0.92f)).padding(horizontal = 14.dp, vertical = 8.dp)
                     .testTag("mcraw:progress"))
         }
@@ -1391,6 +1402,7 @@ internal fun RenderChip(modifier: Modifier, selection: ClosedFloatingPointRange<
             Spacer(Modifier.width(4.dp))
             Text(
                 when {
+                    rc.waitingForDevelop -> "Waiting for develops"
                     rc.waitingForProxy -> stringResource(R.string.app_waiting_proxies)
                     p != null -> stringResource(R.string.app_rendering_progress, (p * 100).toInt())
                     rc.renderAll -> stringResource(R.string.app_waiting)
@@ -1440,10 +1452,14 @@ internal fun LabelPicker(current: ClipLabel?, onPick: (ClipLabel?) -> Unit) {
 /** Klipp Lab: the grip between the picture and the timeline in landscape: drag sideways; double tap = back to the default. */
 @Composable
 private fun SplitHandle(onDrag: (Float) -> Unit, onEnd: () -> Unit, onReset: () -> Unit) {
+    // (the latest callbacks: the gesture detectors live on, and kept the first ones - see MonitorHandle)
+    val drag by androidx.compose.runtime.rememberUpdatedState(onDrag)
+    val end by androidx.compose.runtime.rememberUpdatedState(onEnd)
+    val reset by androidx.compose.runtime.rememberUpdatedState(onReset)
     Box(
-        Modifier.width(14.dp).fillMaxHeight()
-            .pointerInput(Unit) { detectHorizontalDragGestures(onDragEnd = onEnd) { ch, dx -> ch.consume(); onDrag(dx) } }
-            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onReset() }) }
+        Modifier.width(20.dp).fillMaxHeight()
+            .pointerInput(Unit) { detectHorizontalDragGestures(onDragEnd = { end() }) { ch, dx -> ch.consume(); drag(dx) } }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { reset() }) }
             .testTag("splitHandle"),
         contentAlignment = Alignment.Center,
     ) { Box(Modifier.size(4.dp, 40.dp).clip(RoundedCornerShape(2.dp)).background(K.OutlineVar)) }
@@ -1452,10 +1468,16 @@ private fun SplitHandle(onDrag: (Float) -> Unit, onEnd: () -> Unit, onReset: () 
 /** The grip under the transport: drag to make the picture taller or shorter; double tap = back to the project's shape. */
 @Composable
 private fun MonitorHandle(onDrag: (Float) -> Unit, onEnd: () -> Unit, onReset: () -> Unit) {
+    // Klipp Lab: the gesture detectors are made once and kept the first callbacks, which wrote to the first project
+    // shape's height: after a project of another shape (a 4:3 RAW clip after 16:9 video) the grip did nothing. They
+    // call the latest ones now; and the grip is a little taller, easier to catch under the transport.
+    val drag by androidx.compose.runtime.rememberUpdatedState(onDrag)
+    val end by androidx.compose.runtime.rememberUpdatedState(onEnd)
+    val reset by androidx.compose.runtime.rememberUpdatedState(onReset)
     Box(
-        Modifier.fillMaxWidth().height(14.dp)
-            .pointerInput(Unit) { detectVerticalDragGestures(onDragEnd = onEnd) { ch, dy -> ch.consume(); onDrag(dy) } }
-            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onReset() }) }
+        Modifier.fillMaxWidth().height(20.dp)
+            .pointerInput(Unit) { detectVerticalDragGestures(onDragEnd = { end() }) { ch, dy -> ch.consume(); drag(dy) } }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { reset() }) }
             .testTag("monitorHandle"),
         contentAlignment = Alignment.Center,
     ) { Box(Modifier.size(40.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(K.OutlineVar)) }

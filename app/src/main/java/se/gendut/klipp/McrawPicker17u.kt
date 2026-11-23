@@ -75,21 +75,42 @@ object McrawFolder17u {
     fun out(c: Context): String = p(c).getString("out", null) ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key
     fun setOut(c: Context, k: String) { p(c).edit().putString("out", k).apply() }
 
-    class File(val uri: Uri, val name: String, val bytes: Long, val time: Long)
+    /** [dng]: a folder of DNG frames (PhotonCamera's raw video, CinemaDNG), see DngSeq17u. */
+    class File(val uri: Uri, val name: String, val bytes: Long, val time: Long, val dng: Boolean = false)
 
     fun list(c: Context): List<File> {
         val tree = tree(c) ?: return emptyList()
         val kids = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val out = ArrayList<File>()
+        // Klipp Lab: the picked folder can itself be a DNG clip (a PhotonCamera VID_… folder): it is listed as one, with
+        // the sound beside its frames - not its hidden .dng folder on its own
+        val root = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        se.gendut.klipp.engine.DngSeq17u.contents(c, root)?.let { dng ->
+            val rootName = runCatching {
+                c.contentResolver.query(root, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) to it.getLong(1) else null }
+            }.getOrNull()
+            out += File(root, rootName?.first ?: "DNG", dng.bytes, rootName?.second ?: 0L, dng = true)
+            return out
+        }
         runCatching {
             c.contentResolver.query(kids, arrayOf(
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                 DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
             ), null, null, null)?.use { k ->
                 while (k.moveToNext()) {
                     val name = k.getString(1) ?: continue
+                    val uri = DocumentsContract.buildDocumentUriUsingTree(tree, k.getString(0))
+                    // Klipp Lab: a folder of DNG frames is a clip too (PhotonCamera's raw video, CinemaDNG)
+                    if (k.getString(4) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (name.equals(".dng", true)) continue
+                        val dng = se.gendut.klipp.engine.DngSeq17u.contents(c, uri) ?: continue
+                        out += File(uri, name, dng.bytes, k.getLong(3), dng = true)
+                        continue
+                    }
                     if (!name.endsWith(".mcraw", true)) continue
-                    out += File(DocumentsContract.buildDocumentUriUsingTree(tree, k.getString(0)), name, k.getLong(2), k.getLong(3))
+                    out += File(uri, name, k.getLong(2), k.getLong(3))
                 }
             }
         }
@@ -140,7 +161,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onList: (List<Uri>) -> Unit = {
     }
     when {
         list == null -> Box(Modifier.fillMaxWidth().weight(1f))
-        list.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f).padding(24.dp)) { Text("No .mcraw files in this folder.", color = K.OnSurfaceVar, fontSize = 15.sp) }
+        list.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f).padding(24.dp)) { Text("No .mcraw files or DNG folders here.", color = K.OnSurfaceVar, fontSize = 15.sp) }
         else -> LazyVerticalGrid(
             GridCells.Adaptive(150.dp), Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -161,7 +182,9 @@ private fun McrawCard(f: McrawFolder17u.File, order: Int, onClick: () -> Unit) {
     val key = f.uri.toString()
     val thumb = McrawThumbs.cache[key]
     LaunchedEffect(key) {
-        if (McrawThumbs.cache[key] == null) withContext(Dispatchers.IO) { Mcraw.thumb(ctx, f.uri)?.let { McrawThumbs.cache[key] = it } }
+        if (McrawThumbs.cache[key] == null) withContext(Dispatchers.IO) {
+            (if (f.dng) se.gendut.klipp.engine.DngSeq17u.thumb(ctx, f.uri) else Mcraw.thumb(ctx, f.uri))?.let { McrawThumbs.cache[key] = it }
+        }
     }
     val shape = RoundedCornerShape(14.dp)
     Column(
@@ -177,7 +200,7 @@ private fun McrawCard(f: McrawFolder17u.File, order: Int, onClick: () -> Unit) {
                     modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(K.Bg.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-            Text("RAW", color = K.OnPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+            Text(if (f.dng) "DNG" else "RAW", color = K.OnPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(K.Primary).padding(horizontal = 6.dp, vertical = 2.dp))
             if (order > 0) Box(
                 Modifier.align(Alignment.Center).size(30.dp).clip(RoundedCornerShape(15.dp)).background(K.Primary),

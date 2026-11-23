@@ -105,6 +105,8 @@ class ProjectController(
         state.backend = this
         state.props = this
         McrawStore17u.relink = { old, new -> relinkMcraw17u(old, new) }
+        McrawStore17u.has = { u -> uris.containsValue(u) }
+        McrawStore17u.remove = { u -> uris.filterValues { it == u }.keys.toList().takeIf { it.isNotEmpty() }?.let { deleteMedia(it, emptyList()) } }
     }
 
     /**
@@ -119,7 +121,17 @@ class ProjectController(
                 val pfd = withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { context.contentResolver.openFileDescriptor(new, "r") }.getOrNull() } ?: continue
                 val ok = engine.tryExec("media.relink", JSONObject().put("item", id)
                     .put("path", FdPath.of(pfd.fd, displayName(new), context.contentResolver.getType(new))).put("force", true)).isSuccess
-                if (ok) { fds += pfd; uris[id] = new; n++ } else runCatching { pfd.close() }
+                if (ok) {
+                    fds += pfd; uris[id] = new; n++
+                    // a placeholder's media takes the clip's own name (it showed "…_placeholder_…")
+                    // (the media and its clips already on the timeline: a clip keeps the name it was put in with - lut95)
+                    if (Placeholder17u.isPlaceholder(old)) Placeholder17u.clipName(old)?.let { name ->
+                        engine.tryExec("clip.rename", JSONObject().put("item", id).put("name", name))
+                        engine.snapshot().sequence?.let { q -> (q.video + q.audio).flatMap { t -> t.clips } }.orEmpty()
+                            .filter { it.item == id && it.name.contains(Placeholder17u.MARK) }
+                            .forEach { c -> engine.tryExec("clip.rename", JSONObject().put("clip", c.id).put("name", name)) }
+                    }
+                } else runCatching { pfd.close() }
             }
             if (n > 0) { refresh(true); saveLocked(); Proxies.request(context, new) }
         }
@@ -287,8 +299,9 @@ class ProjectController(
                         if (first != null && first.width > 0) {
                             // (the rate the frames are at, measured from the file: a file can state another – see MediaProbe.rateOf)
                             val measured = withContext(kotlinx.coroutines.Dispatchers.IO) { uris[first.id]?.let { MediaProbe.probe(context, it)?.fps } }
-                            // Klipp Lab: a MotionCam quick develop is half size – the project gets the full develop's size
-                            val k = if (McrawStore17u.isDraft(context, uris[first.id])) 2 else 1
+                            // Klipp Lab: a MotionCam quick develop (or its placeholder) is half size – the project gets the full develop's size
+                            // (a placeholder left the project at 2048×1280 - lut96b)
+                            val k = if (McrawStore17u.isDraft(context, uris[first.id]) || Placeholder17u.isDraft(uris[first.id])) 2 else 1
                             p.put("width", first.width * k).put("height", first.height * k).put("fps", seqFps ?: firstFps(measured ?: first.fps, uris[first.id]))
                         } else seqFps?.let { p.put("fps", it) }
                         engine.exec("file.newSequence", p)

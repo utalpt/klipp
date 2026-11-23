@@ -103,6 +103,10 @@ object McrawStore17u {
      * left behind is removed by [clean] once no project uses it.
      */
     @Volatile var relink: ((old: Uri, new: Uri) -> Unit)? = null
+    /** Klipp Lab: whether the open project has a media item on this file (a placeholder handed over, see Placeholder17u). Main thread. */
+    @Volatile var has: ((Uri) -> Boolean)? = null
+    /** Klipp Lab: takes this file's media out of the open project, with its clips (a placeholder whose develop failed). */
+    @Volatile var remove: ((Uri) -> Unit)? = null
 
     /** The develop running in the background for the RAW settings: "name: 42 %", null = none. */
     var working by androidx.compose.runtime.mutableStateOf<String?>(null)
@@ -124,6 +128,35 @@ object McrawStore17u {
                 working = null
                 if (r.uri != null && r.uri != old) relink?.invoke(old, r.uri)
                 done(r.uri, r.summary)
+            }
+        }
+    }
+
+    private val manyLock = kotlinx.coroutines.sync.Mutex()
+    /** Klipp Lab: a develop running or waiting (a redevelop, a queue of them, quick develops' full ones): Render waits. */
+    val busy: Boolean get() = working != null || drafts > 0 || manyLock.isLocked
+
+    /**
+     * Klipp Lab: several clips developed again at [ei] into [out], one after another (a grade pasted with its develop):
+     * each put in its old develop's place when done ([relink]), then [done] on the main thread.
+     */
+    fun redevelopMany(c: Context, jobs: List<Pair<Uri, Info>>, ei: Int, out: String, done: (old: Uri, new: Uri?) -> Unit) {
+        if (jobs.isEmpty()) return
+        val app = c.applicationContext
+        bg.launch {
+            manyLock.withLock {
+                for ((k, j) in jobs.withIndex()) {
+                    val (old, info) = j
+                    val left = jobs.size - k
+                    working = "${info.name}: 0 % ($left left)"
+                    val r = runCatching { develop(app, info.source, info.name, ei, out, info.camWb?.toFloatArray()) { p -> working = "${info.name}: ${(p * 100).toInt()} % ($left left)" } }
+                        .getOrElse { McrawConvert.Result(null, it.message ?: it.toString(), "") }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (r.uri != null && r.uri != old) relink?.invoke(old, r.uri)
+                        done(old, r.uri)
+                    }
+                }
+                working = null
             }
         }
     }
@@ -193,7 +226,9 @@ object McrawStore17u {
         for (f in files) {
             if (f.name == "index.json") continue
             val stale = f.name.endsWith(".part") && System.currentTimeMillis() - f.lastModified() > 60 * 60 * 1000L
-            val unused = f.name.endsWith(".mp4") && texts.none { it.contains(f.name) }
+            // (a placeholder just made may not be in a saved project yet: it is left a while)
+            val young = f.name.contains(Placeholder17u.MARK) && System.currentTimeMillis() - f.lastModified() < 30 * 60 * 1000L
+            val unused = f.name.endsWith(".mp4") && !young && texts.none { it.contains(f.name) }
             if (stale || unused) {
                 f.delete()
                 if (o.has(f.name)) { o.remove(f.name); changed = true }

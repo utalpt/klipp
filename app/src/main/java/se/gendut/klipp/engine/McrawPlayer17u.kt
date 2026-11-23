@@ -74,8 +74,8 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
         @Volatile var decodeNs = 0L
         val threads = List(r) { t ->
             Thread({
-                val pfd = ctx.contentResolver.openFileDescriptor(src, "r")
-                val h = pfd?.let { lib.open(it.fd) } ?: 0L
+                val rs = lib.openSource(ctx, src)
+                val h = rs?.h ?: 0L
                 var held: ByteBuffer? = null
                 try {
                     var i = from + t
@@ -90,7 +90,7 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
                 } catch (_: InterruptedException) {
                 } finally {
                     held?.let { free.offer(it) } // stopped mid-frame: its buffer goes back
-                    if (h != 0L) lib.close(h); pfd?.close()
+                    rs?.close()
                 }
             }, "mcraw-play-read-$t").apply { start() }
         }
@@ -110,9 +110,8 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
     private fun run(surface: android.view.Surface, sw: Int, sh: Int, outKey: String, my: Int) {
         fun running() = gen == my
         check(lib.available) { "RAW library not loaded" }
-        val pfd = ctx.contentResolver.openFileDescriptor(src, "r") ?: error("could not open the file")
-        val h = lib.open(pfd.fd)
-        if (h == 0L) { pfd.close(); error("not an MCRAW file") }
+        val source = lib.openSource(ctx, src) ?: error("could not open it as RAW video")
+        val h = source.h
         var track: AudioTrack? = null
         var gl: McrawConvert.Gl? = null
         var readers: Readers? = null
@@ -270,7 +269,7 @@ class McrawPlayer17u(private val ctx: Context, private val src: Uri) {
             readers?.close()
             runCatching { track?.stop() }; track?.release()
             runCatching { gl?.release() }
-            lib.close(h); pfd.close()
+            source.close()
         }
     }
 }

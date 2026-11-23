@@ -278,7 +278,7 @@ object Proxies {
         // a moment and gets its own. One was started as the hold ended, just before the draft was swapped out, and ran
         // beside the full develop's first playback (a crash in the phone's codec followed)
         var job: Job
-        do { job = queue.removeFirstOrNull() ?: return; if (McrawStore17u.isDraft(c, job.uri)) progress.remove(key(job.uri)) else break } while (true)
+        do { job = queue.removeFirstOrNull() ?: return; if (McrawStore17u.isDraft(c, job.uri) || Placeholder17u.isPlaceholder(job.uri)) progress.remove(key(job.uri)) else break } while (true)
         val u = job.uri
         val k = key(u)
         val out = fileFor(c, u, job.sig)
