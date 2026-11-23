@@ -171,7 +171,9 @@ class GradeState {
     private fun put(id: Long, g: ClipGrade?) {
         // empty = a node that neither grades nor has a window/qualifier (those must stay while being set up)
         // (a film turned off is kept for when it is turned on again)
-        if (g == null || (g.isNeutral && g.layer == null && g.nodes.size == 1 && g.nodes.none { it.hasKey || it.filmOff != null })) grades.remove(id) else grades[id] = g
+        // (Klipp Lab: nor one that only says how the clip was recorded – its log curve, with no EI rating: that is not a
+        // grade but it is the clip's input, and it was dropped, so a clip set to another curve went back to S-Log3)
+        if (g == null || (g.isNeutral && g.ei == null && g.layer == null && g.nodes.size == 1 && g.nodes.none { it.hasKey || it.filmOff != null })) grades.remove(id) else grades[id] = g
         // a lingering drag state for the clip would otherwise show the old grade for a while (e.g. after "Reset" or undo)
         if (live?.first == id) live = id to (g ?: ClipGrade())
         revision++
@@ -332,6 +334,7 @@ data class ColorClip(
     val hold: Double? = null,
     /** Reverse. */
     val reverse: Boolean = false,
+    val item: Long = -1,
 )
 
 /** The clip the color page works on: the selected one, else the topmost under the playhead, else the first. */
@@ -355,6 +358,7 @@ fun ColorPage(
     look: se.gendut.klipp.engine.Look = se.gendut.klipp.engine.Look.NONE,
     /** Import a .cube; calls the callback with the LUT's name. */
     onImportLut: (((String) -> Unit) -> Unit)? = null,
+    rawControls: @Composable (ColorClip) -> Unit = {},
     timeline: @Composable () -> Unit,
 ) {
     val haptics = rememberHaptics()
@@ -387,6 +391,7 @@ fun ColorPage(
             state.playing = false
             if (state.playhead < c.start || state.playhead >= c.end) state.playhead = (c.start + c.end) / 2
         }
+        current?.let { rawControls(it) }
         NodeRow(
             current, g, node?.id, more,
             onPick = { haptics.tick(); nodeId = it; more = false },
@@ -553,12 +558,13 @@ private fun NodeRow(
                     ei == null || ei.shot <= 0 -> "EI"
                     ei.rated > 0 && ei.rated != ei.shot -> "EI ${ei.shot}→${ei.rated}"
                     else -> "EI ${ei.shot}"
-                }
+                } + if (ei?.hasWb == true) " · WB" else ""
                 val eiSrc = remember { MutableInteractionSource() }
                 Box(
                     Modifier.pressPop(eiSrc, 0.92f).height(44.dp).clip(RoundedCornerShape(14.dp))
                         .background(if (ei?.active == true) K.PrimaryContainer.copy(alpha = 0.5f) else K.SurfaceHigh)
-                        .clickable(interactionSource = eiSrc, indication = null, role = Role.Button, onClick = onInput)
+                        .combinedClickable(interactionSource = eiSrc, indication = null, role = Role.Button,
+                            onLongClick = onLongHelp17u(eiText, Help17uText.of("clipInput")), onClick = onInput)
                         .padding(horizontal = 12.dp).testTag("clipInput"),
                     contentAlignment = Alignment.Center,
                 ) { Text(eiText, color = if ((ei?.shot ?: 0) > 0) K.OnSurface else K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
@@ -573,7 +579,8 @@ private fun NodeRow(
                 val src = remember { MutableInteractionSource() }
                 Box(
                     Modifier.pressPop(src, 0.88f).size(44.dp).clip(RoundedCornerShape(14.dp)).border(1.5.dp, K.Outline, RoundedCornerShape(14.dp))
-                        .clickable(interactionSource = src, indication = null, role = Role.Button, onClick = onAdd).testTag("addNode"),
+                        .combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+                            onLongClick = onLongHelp17u(stringResource(R.string.colorpage_new_node), Help17uText.of("addNode")), onClick = onAdd).testTag("addNode"),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Ic.Plus, stringResource(R.string.colorpage_new_node), tint = K.OnSurface, modifier = Modifier.size(18.dp)) }
             }
@@ -794,7 +801,9 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
     val g = gs.of(current.id)
     // (the curve: the clip's own, else the first OpenDRT node's, else S-Log3)
     val ei = g.ei ?: se.gendut.klipp.engine.InputEi(g.nodes.firstNotNullOfOrNull { it.drt }?.input ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key)
-    fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = e.takeIf { it.shot > 0 }))
+    fun keep(e: se.gendut.klipp.engine.InputEi) = e.takeIf { it.shot > 0 || it.hasWb || it.input != se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key }
+    fun set(e: se.gendut.klipp.engine.InputEi) = gs.set(current.id, gs.of(current.id).copy(ei = keep(e)))
+    fun live(e: se.gendut.klipp.engine.InputEi) = gs.setLive(current.id, (gs.shown(current.id) ?: g).copy(ei = keep(e)))
     Text(stringResource(R.string.colorpage_input_title), color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp))
     Text(stringResource(R.string.colorpage_input_intro), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
     val inputs = se.gendut.klipp.engine.OpenDrt.Input.entries.filter { it != se.gendut.klipp.engine.OpenDrt.Input.REC709 }
@@ -817,6 +826,18 @@ private fun ClipInputEditor(gs: GradeState, clips: List<ColorClip>, current: Col
             color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
         )
     }
+    // Klipp Lab: white balance in the linear light, before the nodes (as a raw developer's; see InputEi.wbGains)
+    Text(stringResource(R.string.colorpage17u_wb_note), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp))
+    val asShot = stringResource(R.string.colorpage17u_wb_as_shot)
+    val ref = se.gendut.klipp.engine.InputEi.WB_REF.toFloat()
+    fun kOf(v: Float) = ((v / 50f).roundToInt() * 50).let { if (it == ref.toInt()) 0 else it }
+    PropSlider(stringResource(R.string.colorpage17u_wb_temp), if (ei.temp > 0) ei.temp.toFloat() else ref, 2000f, 12000f, ref,
+        { kOf(it).let { k -> if (k == 0) asShot else "$k K" } }, "clipInput:temp", lane = false,
+        onLive = { live(ei.copy(temp = kOf(it))) }) { set(ei.copy(temp = kOf(it))) }
+    PropSlider(stringResource(R.string.colorpage17u_wb_tint), ei.tint.toFloat(), -100f, 100f, 0f,
+        { "%+d".format(it.roundToInt()) }, "clipInput:tint", lane = false,
+        onLive = { live(ei.copy(tint = it.roundToInt())) }) { set(ei.copy(tint = it.roundToInt())) }
+    McrawRawSection17u(gs, clips, current) // Klipp Lab: a MotionCam clip's develop (EI, output), changeable any time
     if (g.ei != null && clips.size > 1) ToggleChip(stringResource(R.string.colorpage_input_all), false, {
         haptics.confirm()
         gs.setAll(clips.filter { it.id != current.id }.associate { it.id to gs.of(it.id).copy(ei = g.ei) })
@@ -967,12 +988,14 @@ fun ColorViewerTools(
 
 /** A pill over the picture: dark and see-through, in the accent's container color while its tool is on. */
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun ViewerChip(label: String, icon: ImageVector, on: Boolean, tag: String, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val bg by animateColorAsState(if (on) K.PrimaryContainer else Color(0xB20F1012), label = "vc")
     val fg = if (on) K.PrimarySoft else Color.White
     Box(
-        Modifier.pressPop(src, 0.9f).height(44.dp).clickable(interactionSource = src, indication = null, role = Role.Button, onClick = onClick).testTag(tag),
+        Modifier.pressPop(src, 0.9f).height(44.dp).combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+            onLongClick = onLongHelp17u(label, Help17uText.of(tag)), onClick = onClick).testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -1033,7 +1056,8 @@ private fun WheelsPanel(
             val src = remember { MutableInteractionSource() }
             Box(
                 Modifier.pressPop(src, 0.88f).size(44.dp).clip(RoundedCornerShape(14.dp))
-                    .clickable(interactionSource = src, indication = null, role = Role.Button) {
+                    .combinedClickable(interactionSource = src, indication = null, role = Role.Button,
+                        onLongClick = onLongHelp17u(stringResource(R.string.design_color_reset_wheels), Help17uText.of("wheels:reset"))) {
                         // all of this mode's wheels in one step
                         val reset = if (!log) n.copy(lift = Wheel(), gamma = Wheel(), gain = Wheel(), offset = Wheel())
                         else n.copy(logShadow = Wheel(), logMid = Wheel(), logHi = Wheel(), offset = Wheel(), logLow = 0.333f, logHigh = 0.55f)
@@ -1051,7 +1075,7 @@ private fun WheelsPanel(
                 }
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     for ((i, r) in ranges.withIndex()) {
-                        RangeButton(r.label, r.wheel, r === cur, Modifier.weight(1f).testTag("range:${r.key}")) { haptics.tick(); at = i }
+                        RangeButton(r.label, r.wheel, r === cur, Modifier.weight(1f).testTag("range:${r.key}"), Help17uText.of("range:${r.key}")) { haptics.tick(); at = i }
                     }
                 }
             }
@@ -1065,21 +1089,22 @@ private fun WheelsPanel(
                 onLive = { onLive(n.copy(logHigh = it / 100f)) }) { onCommit(n.copy(logHigh = it / 100f)) }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FlatButton(if (wbOn) stringResource(R.string.design_color_cancel_pick) else stringResource(R.string.colorpage_group_balance), Ic.Dropper, wbOn, Modifier.weight(1f).testTag("wheels:wb"), onWb)
-            FlatButton(stringResource(if (canPaste) R.string.design_color_paste_grade else R.string.design_color_copy_grade), if (canPaste) Ic.Paste else Ic.Copy, false, Modifier.weight(1f).testTag("wheels:copy"), onCopyPaste)
+            FlatButton(if (wbOn) stringResource(R.string.design_color_cancel_pick) else stringResource(R.string.colorpage_group_balance), Ic.Dropper, wbOn, Modifier.weight(1f).testTag("wheels:wb"), onWb, Help17uText.of("wheels:wb"))
+            FlatButton(stringResource(if (canPaste) R.string.design_color_paste_grade else R.string.design_color_copy_grade), if (canPaste) Ic.Paste else Ic.Copy, false, Modifier.weight(1f).testTag("wheels:copy"), onCopyPaste, Help17uText.of("wheels:copy"))
         }
     }
 }
 
 /** Primaries or Log: the chosen one a light pill, the other gray with its small corners toward it. */
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun WheelMode(label: String, on: Boolean, first: Boolean, tag: String, onClick: () -> Unit) {
     val bg by animateColorAsState(if (on) K.OnSurface else K.SurfaceHigh, label = "wm")
     val inner by animateDpAsState(if (on) 22.dp else 8.dp, spring(0.55f, 700f), label = "wmr")
     val shape = if (first) RoundedCornerShape(22.dp, inner, inner, 22.dp) else RoundedCornerShape(inner, 22.dp, 22.dp, inner)
     Box(
         Modifier.height(44.dp).clip(shape).background(bg)
-            .clickable(role = Role.Tab, onClick = onClick).semantics { selected = on }
+            .combinedClickable(role = Role.Tab, onLongClick = onLongHelp17u(label, Help17uText.of(tag)), onClick = onClick).semantics { selected = on }
             .padding(horizontal = if (on) 18.dp else 16.dp).testTag(tag),
         contentAlignment = Alignment.Center,
     ) { Text(label, color = if (on) K.Bg else K.OnSurface, fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1) }
@@ -1087,7 +1112,8 @@ private fun WheelMode(label: String, on: Boolean, first: Boolean, tag: String, o
 
 /** A range beside the wheel: its wheel small (the dot is where its puck is) and its name. */
 @Composable
-private fun RangeButton(label: String, w: Wheel, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun RangeButton(label: String, w: Wheel, on: Boolean, modifier: Modifier, help: String? = null, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val r by animateDpAsState(if (on) 28.dp else 12.dp, spring(0.55f, 600f), label = "rr")
     val bg by animateColorAsState(if (on) K.PrimaryContainer else K.SurfaceHigh, label = "rb")
@@ -1095,7 +1121,7 @@ private fun RangeButton(label: String, w: Wheel, on: Boolean, modifier: Modifier
     val ring = if (on) K.Primary else K.Outline
     Row(
         modifier.fillMaxWidth().pressPop(src, 0.94f).clip(RoundedCornerShape(r)).background(bg)
-            .clickable(interactionSource = src, indication = null, role = Role.Tab, onClick = onClick).semantics { selected = on }
+            .combinedClickable(interactionSource = src, indication = null, role = Role.Tab, onLongClick = onLongHelp17u(label, help), onClick = onClick).semantics { selected = on }
             .padding(horizontal = if (on) 8.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1115,13 +1141,14 @@ private fun RangeButton(label: String, w: Wheel, on: Boolean, modifier: Modifier
 
 /** A wide, flat button under a tool: an icon and a name; in the accent's container color while [on]. */
 @Composable
-private fun FlatButton(label: String, icon: ImageVector, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun FlatButton(label: String, icon: ImageVector, on: Boolean, modifier: Modifier, onClick: () -> Unit, help: String? = null) {
     val src = remember { MutableInteractionSource() }
     val bg by animateColorAsState(if (on) K.PrimaryContainer else K.SurfaceHigh, label = "fb")
     val fg = if (on) K.PrimarySoft else K.OnSurface
     Row(
         modifier.pressPop(src, 0.94f).height(44.dp).clip(RoundedCornerShape(14.dp)).background(bg)
-            .clickable(interactionSource = src, indication = null, role = Role.Button, onClick = onClick).padding(horizontal = 8.dp),
+            .combinedClickable(interactionSource = src, indication = null, role = Role.Button, onLongClick = onLongHelp17u(label, help), onClick = onClick).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp))

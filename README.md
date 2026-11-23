@@ -25,14 +25,19 @@
 - 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
   linear light before all nodes, as in a raw developer – live while dragging.
 - 📸 **MotionCam RAW (.mcraw) in:** the video picker's MotionCam RAW chip lists the .mcraw files of MotionCam's folder; importing
-  develops each one into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
+  develops each one (Quick import: half size first, the full develop in the background) into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
   with the camera's white balance. The RAW settings stay changeable afterwards, as in a raw developer: on the Color page
   pick another EI or log and Develop again (the clip is swapped in place, with a new proxy), and the clip's
   Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. *(Early:
   feedback welcome.)*
+- 🎞️ **Cinematic RAW Studio (.CRAW) in** – by [matthew777777](https://github.com/matthew777777): .CRAW clips – from the video
+  picker's Cinematic RAW chip (the folder the app records into, picked once) or Import → Files app – are developed into an editable log copy (with AAC sound), at the log and EI chosen in the dialog
+  that opens, on the GPU (the same develop as MotionCam RAW, with Quick import and RAW settings; RGB-cell takes on the CPU); RAW settings, or **CRAW development** for a CPU develop, develop a clip again in place. Read with the app's own
+  Apache-2.0 decoder (`third_party/craw`). Needs Android 12+ and a 10-bit HEVC encoder.
 - 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
 - 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete.
-- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names.
+- 🖼️ **Video picker** with previews (log clips included), opening in DCIM/Camera; clips keep their file names; Select all
+  picks every video shown (a folder or the MotionCam RAW list), oldest first.
 - 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
   the system again before sending you to the settings. *(Sent to Klipp too: in Klipp 0.21.0-beta.2.)*
 - ➕ **Add to the timeline** in the order selected, or straight on import.
@@ -62,7 +67,8 @@ https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
 🙏 Credits: [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the
 [FilmCraft](https://github.com/storytold/filmcraft) engine. Film simulation from
 [spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato et al. [OpenDRT](https://github.com/jedypod/open-display-transform) by Jed Smith. EI relation
-and slow-mo idea from George Kiarie's RawViewer. MotionCam RAW read with MotionCam's own decoder library,
+and slow-mo idea from George Kiarie's RawViewer. Cinematic RAW Studio .CRAW import by matthew777777, with his app's decoder (Apache-2.0).
+MotionCam RAW read with MotionCam's own decoder library,
 [motioncam-decoder](https://github.com/mirsadm/motioncam-decoder) (Apache-2.0, with the MIT-licensed JSON for Modern
 C++ by Niels Lohmann and SIMDe). Dolby Vision approach from Dolby's
 [dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor) sample (BSD-3-Clause-Clear).
@@ -184,6 +190,10 @@ replace an installed Klipp.
 
 ## ⚠️ Known limitations
 
+- Cinematic RAW Studio `.CRAW` video opens through **Import → Files app** on devices with a compatible
+  10-bit HEVC encoder. Klipp develops an editable log copy with AAC audio when present and keeps the source
+  linked. The editing copy is scaled to fit the encoder when needed. Use **CRAW development** on the Color
+  page to choose a different log profile or exposure index and develop the clip again in place.
 - Clips imported through the system photo picker get generic names (e.g. `28.mp4`) – Android hides the file names.
 - Projects live inside the app: back them up with their media (Projects → long-press → Back up to a folder… or Save a
   project package with media…) before uninstalling Klipp or moving to another phone.

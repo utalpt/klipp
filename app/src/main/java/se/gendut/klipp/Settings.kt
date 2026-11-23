@@ -158,7 +158,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
     // (the empty parts take the touches too: the editor lies under the page)
     Column(Modifier.fillMaxSize().background(K.Bg).pointerInput(Unit) {}.safeArea17u().testTag("settings")) {
         var page by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1) }
-        val pageTitles = listOf(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_group_playback), stringResource(R.string.settings_group_export), stringResource(R.string.settings_group_developer), stringResource(R.string.settings_group_help), stringResource(R.string.settings_group_about))
+        val pageTitles = listOf(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_group_playback), stringResource(R.string.settings_group_export), stringResource(R.string.settings_group_developer), stringResource(R.string.settings_group_help), stringResource(R.string.settings_group_about), stringResource(R.string.settings17u_storage), "Grading for beginners")
         val about = remember { AboutNav() }
         if (page >= 0) androidx.activity.compose.BackHandler { page = -1 }
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -174,10 +174,12 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                     CategoryRow(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_cat_appearance), Ic.Eye, "set:cat:appearance") { page = 0 }
                     CategoryRow(stringResource(R.string.settings_group_timeline), stringResource(R.string.settings_cat_timeline), Ic.Trim, "set:cat:timeline") { page = 1 }
                     CategoryRow(stringResource(R.string.settings_group_pipeline), stringResource(R.string.settings_cat_pipeline), Ic.Film, "set:cat:pipeline") { page = 2 }
-                    CategoryRow(stringResource(R.string.settings_group_playback), stringResource(R.string.settings_cat_playback), Ic.Folder, "set:cat:playback") { page = 3 }
+                    CategoryRow(stringResource(R.string.settings_group_playback), stringResource(R.string.settings_cat_playback), Ic.Play, "set:cat:playback") { page = 3 }
+                    CategoryRow(stringResource(R.string.settings17u_storage), stringResource(R.string.settings17u_cat_storage), Ic.Folder, "set:cat:storage") { page = 8 }
                     CategoryRow(stringResource(R.string.settings_group_export), stringResource(R.string.settings_cat_export), Ic.Download, "set:cat:export") { page = 4 }
                     CategoryRow(stringResource(R.string.settings_group_developer), stringResource(R.string.settings_cat_developer), Ic.Gear, "set:cat:developer") { page = 5 }
                     CategoryRow(stringResource(R.string.settings_group_help), stringResource(R.string.settings_cat_help), Ic.Bulb, "set:cat:help") { page = 6 }
+                    CategoryRow("Grading for beginners", "Log footage to a finished image, step by step", Ic.Wheels, "set:cat:grading") { page = 9 }
                     CategoryRow(stringResource(R.string.settings_group_about), stringResource(R.string.settings_cat_about), Ic.Transcript, "set:cat:about") { page = 7 }
                 }
                 0 -> PanelCard(Modifier.padding(top = 8.dp)) {
@@ -278,8 +280,18 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
 
                 }
                 3 -> PanelCard(Modifier.padding(top = 8.dp)) {
-            StorageSummary(ctx)
             ProxySection(ctx)
+            var renderAuto by remember { mutableStateOf(se.gendut.klipp.engine.RenderCache.auto) }
+            SwitchRow(stringResource(R.string.settings_render_auto), stringResource(R.string.app_render_auto_hint), renderAuto, "set:renderAuto") {
+                renderAuto = it; se.gendut.klipp.engine.RenderCache.setAuto(ctx, it)
+            }
+
+                }
+                // Klipp Lab: Storage – everything the app keeps on the phone, each with its Clear, and the warning limit
+                8 -> PanelCard(Modifier.padding(top = 8.dp)) {
+            StorageSummary(ctx)
+            Storage17uRows(ctx)
+            Proxy17uRow(ctx)
             var cacheSize by remember { mutableStateOf(0L) }
             androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.NodeCache.revision) {
                 cacheSize = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { se.gendut.klipp.engine.NodeCache.size(ctx) }
@@ -291,10 +303,6 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                         color = K.OnSurfaceVar, fontSize = 12.sp)
                 }
                 FlatTextButton(onClick = { se.gendut.klipp.engine.NodeCache.clear(ctx); cacheSize = 0 }, modifier = Modifier.testTag("set:clearNodeCache")) { Text(stringResource(R.string.settings_clear)) }
-            }
-            var renderAuto by remember { mutableStateOf(se.gendut.klipp.engine.RenderCache.auto) }
-            SwitchRow(stringResource(R.string.settings_render_auto), stringResource(R.string.app_render_auto_hint), renderAuto, "set:renderAuto") {
-                renderAuto = it; se.gendut.klipp.engine.RenderCache.setAuto(ctx, it)
             }
             var renderSize by remember { mutableStateOf(0L) }
             androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.RenderCache.revision) {
@@ -308,6 +316,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
                 FlatTextButton(onClick = { se.gendut.klipp.engine.RenderCache.clear(); renderSize = 0 }, modifier = Modifier.testTag("set:clearRenders")) { Text(stringResource(R.string.settings_clear)) }
             }
 
+            Clear17uAll(ctx)
                 }
                 4 -> PanelCard(Modifier.padding(top = 8.dp)) {
             Text(stringResource(R.string.settings_export_note), color = K.OnSurfaceVar, fontSize = 12.sp,
@@ -344,6 +353,7 @@ fun SettingsScreen(onClose: () -> Unit, onCenterDefault: (Boolean) -> Unit = {},
             if (reset) Text(stringResource(R.string.settings_help_tips_back), color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp).testTag("set:tipsBack"))
                 }
                 7 -> AboutPage(about)
+                9 -> PanelCard(Modifier.padding(top = 8.dp)) { Grading17uGuide() }
             }
         }
     }
@@ -434,23 +444,25 @@ private fun AccentTones() {
  */
 @Composable
 private fun StorageSummary(ctx: android.content.Context) {
-    data class Use(val proxies: Long, val cache: Long, val renders: Long, val other: Long, val free: Long)
+    data class Use(val proxies: Long, val cache: Long, val renders: Long, val other: Long, val free: Long, val mcraw: Long = 0L)
     var use by remember { mutableStateOf<Use?>(null) }
     androidx.compose.runtime.LaunchedEffect(se.gendut.klipp.engine.Proxies.revision, se.gendut.klipp.engine.NodeCache.revision,
-        se.gendut.klipp.engine.RenderCache.revision, se.gendut.klipp.engine.HoldVideos.revision) {
+        se.gendut.klipp.engine.RenderCache.revision, se.gendut.klipp.engine.HoldVideos.revision,
+        se.gendut.klipp.engine.McrawStore17u.revision) {
         use = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             fun dirSize(name: String) = java.io.File(ctx.filesDir, name).walkBottomUp().filter { it.isFile }.sumOf { it.length() }
             Use(
                 se.gendut.klipp.engine.Proxies.size(ctx), se.gendut.klipp.engine.NodeCache.size(ctx), se.gendut.klipp.engine.RenderCache.bytes(),
                 dirSize("holds") + dirSize("reversed"),
                 runCatching { android.os.StatFs(ctx.filesDir.path).availableBytes }.getOrDefault(0L),
+                se.gendut.klipp.engine.McrawStore17u.bytes(ctx), // Klipp Lab: the MCRAW develops count in the total
             )
         }
     }
     val u = use ?: return
     val gb = { b: Long -> b / 1e9 }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).testTag("set:storage")) {
-        Text(stringResource(R.string.settings_storage_summary, gb(u.proxies + u.cache + u.renders + u.other), gb(u.free)),
+        Text(stringResource(R.string.settings_storage_summary, gb(u.proxies + u.cache + u.renders + u.other + u.mcraw), gb(u.free)),
             color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.settings_storage_parts, gb(u.proxies), gb(u.cache), gb(u.renders), gb(u.other)),
             color = K.OnSurfaceVar, fontSize = 12.sp)

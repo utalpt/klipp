@@ -55,6 +55,114 @@ Import and timeline
   (motioncam-decoder, Apache-2.0) and shows how fast the phone decodes it (one and four threads), the file's metadata
   and a quick preview of the middle frame. First step towards importing .mcraw; the log goes to
   Android/data/x17u.klipp.editor/files/mcraw_probe.txt.
+- MCRAW → S-Log3 (in the MCRAW test's result: Convert to S-Log3): develops the .mcraw on the GPU – the frame's own
+  black level, MotionCam's lens shading map, as-shot white balance, demosaic, the camera's colour matrix, S-Gamut3 and
+  S-Log3, the sensor's clip at EI 800 – into a 10-bit HEVC clip in Movies/Klipp Lab (BT.2020, SDR transfer tag,
+  limited range, so Klipp edits it as log), with the file's sound as AAC, timed.
+- Import a MotionCam .mcraw: Import → Files app now lists .mcraw files too; a picked one is developed to S-Log3 /
+  S-Gamut3.Cine (as above, with a progress dialog) and the clip goes in with the rest – Klipp's default input, so no
+  setting to change.
+- MCRAW: the padding MotionCam leaves below the picture (a 4096×3072 frame holding a 4096×2560 picture, the rest at
+  the black level) is left out: the clip is the picture's own size, without the black band at the bottom.
+- Video picker → MotionCam RAW: the .mcraw files of MotionCam's folder (picked once, Documents/MotionCam by default)
+  with a preview of the middle frame, size, frame rate, length and date; picked with the videos and developed to S-Log3
+  on import. "Develop at EI" 400 / 800 / 1600 / 3200 sets where the sensor's clip lands (as on a log camera).
+- MCRAW develops live in the app's own storage (not the gallery): a .mcraw imported again at the same EI reuses its
+  develop, and a develop no project uses any more is removed when a project is opened or deleted. Settings → Storage
+  shows their size, with Clear, and they count in the "Klipp uses" total above it.
+- MCRAW: every develop asks for its playback proxy at once. A develop made again (RAW settings) could be left without
+  one – its info was still empty when the proxies were checked – and played from the 4K 60 fps file, with the picture
+  standing still.
+- Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
+  a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
+  OpenDRT.
+- Quick import: no proxy for the quick (half-size) develop. As the full develop finished, a proxy of the draft was
+  started just before the draft was swapped out, and ran beside the full develop's first playback; the phone's codec
+  crashed once there (in Android's codec, CodecLooper). The swap now comes first, then the proxies.
+- Clip input: a log curve set on a clip with no grade otherwise (Color → the clip's input, or a RAW develop into
+  another output) stayed: it was dropped as "no grade", and the clip went back to S-Log3 – a .CRAW or .mcraw developed
+  again into ARRI LogC3 kept being read as S-Log3.
+- .CRAW on the GPU: CFA takes are developed by the MotionCam RAW develop (one shader: levels, white balance, lens
+  shading, demosaic, colour, log curve) at the log and EI chosen in the dialog, instead of on the CPU (about 1.3
+  frames a second at 4K, some 4 minutes for 10 s). The frames come from matthew777777's Cinematic RAW Studio decoder
+  (third_party/craw, Apache-2.0), unchanged; Klipp Lab adds a small reader for it (craw17u_jni.cpp). They get what
+  MotionCam RAW has: Quick import, a proxy, RAW settings (EI, output, white balance) to develop again. RGB-cell takes
+  stay on the CPU develop. Measured on a 4096×3072 30 fps take of 10.9 s: quick develop 5.1 s, full develop 9.2 s
+  (the CPU develop: about 4 minutes); the full develop decodes on 3 threads (a .CRAW frame takes ~50 ms to decode).
+- .CRAW develop shows its progress ("Developing <name> (CRAW)… N %") in the strip at the top, on import and on CRAW
+  development – it ran with nothing on screen.
+- Video picker: a Cinematic RAW chip beside MotionCam RAW – the .CRAW files of the folder Cinematic RAW Studio records
+  into (picked once; the app lets you choose it, Download/RawLens by default), each with a preview of its middle
+  frame (developed small with the CRAW decoder), size, rate and length; picked like the videos, the develop settings
+  asked on import.
+- Cinematic RAW Studio .CRAW import and re-development – contributed by matthew777777 (PR #1), with the Cinematic RAW
+  Studio decoder (Apache-2.0, third_party/craw): a .CRAW picked through the Files app asks its develop settings (log,
+  EI), is developed into an editable 10-bit log copy with its sound, and can be developed again from the Color page
+  (CRAW development). Merged with the MotionCam import: both RAW kinds can be picked together.
+- MCRAW import, the app stays usable: the develops (decoding, sound, drawing) run at background priority, and after
+  the first clip the next ones go on the timeline together every ~10 s instead of one at a time.
+- MCRAW in real time (phase 1 of RAW in the timeline, a test): Settings → MCRAW test → pick a file → Play. The .mcraw
+  plays straight from the file, with no develop made: each frame is decoded (three threads) and developed on the GPU
+  at the screen's size, the sound plays from the file and is the clock (late frames are dropped). EI and white balance
+  (Temperature, Tint) change live; Rec.709 to look at, or S-Log3. A line shows frames shown and dropped per second
+  and the decode and draw times.
+- MCRAW import, editing sooner: each clip goes on the timeline as soon as its develop is done (the rest keep developing,
+  shown in a strip at the top that doesn't block the app, with how many are left); the quick develop decodes on three
+  threads (it waited for two); proxies and the background full develops wait while an import is developing.
+- MCRAW develop: the frames are decoded on two threads (one was the limit: 13 ms a frame, 21-27 ms with other work
+  beside it), and proxies wait while the full develops of a Quick import run in the background (they competed for the
+  same reads, GPU and encoder), then follow.
+- MCRAW Quick import (picker chip, on by default): each .mcraw is first developed at half size (each 2×2 CFA block one
+  pixel, no demosaic) so the clips can be edited sooner; the full develop follows in the background, one clip at a
+  time, and takes the draft's place when done (shown in the clip's RAW settings). A project opened again finishes what
+  was left; a new project gets the full size; Export waits (says how many are left) until every clip is full size.
+- MCRAW develop faster: the sound is encoded on its own thread while the frames are developed (it took 2-4 s before
+  them, about a quarter of the time), only the picture's rows are uploaded to the GPU (not MotionCam's padding below
+  it, 17 % of the frame), and three textures in turn so an upload doesn't wait for the GPU to finish the frame before.
+  The log now shows the upload's own time.
+- MCRAW develop log: every develop (import, Develop again, the MCRAW test) adds its log to
+  Android/data/x17u.klipp.editor/files/mcraw_log.txt, with the time per stage – before the frames (open, Auto EI,
+  output file), sound, and per frame: decode, wait, upload and draw, swap, drain – to find where to speed it up.
+- Video picker: Select all – picks every video shown that isn't picked yet (the folder in view, or the MotionCam RAW
+  list), oldest first, so they go on the timeline in the order they were shot. Beside Clear and Import.
+- README credits: links to Klipp, FilmCraft, spektrafilm, OpenDRT and motioncam-decoder, the MIT headers it brings, the
+  deleted-clip HLG fix (Klipp's 2797f03 by Flabbjaxaren), and the published methods the fork's own code follows
+  (Malvar–He–Cutler demosaic, Kim et al.'s Planckian locus fit, ITU-R BT.2100 / BT.2408).
+- Licenses: motioncam-decoder (Apache-2.0) and the two MIT header libraries it brings, JSON for Modern C++ and SIMDe,
+  now in Settings → About → Licenses with their license texts (LICENSES/third-party/motioncam-decoder), in
+  THIRD_PARTY.md and in the README's credits.
+- Storage page: its total says "Klipp Lab uses …" (as the warning), not "Klipp uses".
+- Settings → Storage, a page of its own: the space Klipp Lab uses, a row with Clear for each kind (MotionCam
+  develops, proxies, node cache, renders), Clear caches (proxies, node cache and renders at once, after asking) and the
+  warning limit. Playback keeps the proxy and render settings.
+- HLG · OpenDRT is no longer blocked by the grade of a deleted clip (kept for undo): only the clips on the timeline
+  count – the same fix as Klipp's alpha 241 (2797f03, by Flabbjaxaren).
+- MCRAW → HLG without setting up OpenDRT: with MotionCam clips on the timeline, HLG · OpenDRT (and Dolby Vision ·
+  OpenDRT) can be chosen in the export even when they have no OpenDRT yet; exporting adds it to their grades (on
+  the last node when it does nothing yet, else a node of its own), with the develop's curve as its input – one undo
+  step, and the Color page then shows it.
+- MCRAW white balance in the develop: on a MotionCam clip, Develop puts the white balance set live in the clip's input
+  into the develop – as camera gains on the raw, before the demosaic and the neutral highlight clip, so clipped
+  highlights stay white – and the live one goes back to As shot. Kept through later develops (EI, output).
+- MCRAW Auto EI (now the default, in the picker and the RAW settings): measures the clip's middle frame and picks
+  the EI (one-third stops, 100–3200) that brings its average to 18 % grey – for import-and-export without choosing.
+- Long-press help across the app: holding a control still explains what it does – the sliders (by their name),
+  drop-down fields, dock actions, the tool rails, and on the Color page the EI chip, + node, Compare, Scope, the
+  wheel modes and ranges, White balance and Copy grade: Color (primaries, Log ranges, qualifier, window, LUT, OpenDRT
+  grey, film), the clip's input and white balance, MotionCam RAW, Properties (transform, crop, key, mask), Export,
+  the project and Settings fields, and the timeline's actions. A tap or a drag works as before (the controls take it
+  as their own long click, as Android's). (English for now.)
+- MotionCam RAW settings, changeable at any time (Color → the EI chip → MotionCam RAW): "Develop at EI" and Output
+  (any of Klipp's log curves and gamuts – S-Log3 / S-Gamut3.Cine, LogC3/LogC4, V-Log, DaVinci Intermediate, ACEScct …).
+  Develop makes a new develop from the .mcraw in the background; the clip switches to it when done, keeps its grade,
+  and its input and OpenDRT nodes follow the new curve. The picker's MotionCam RAW chip also has "Develop into".
+- White balance in the clip's input (Color → the EI chip): Temperature (2000–12000 K, "As shot" in the middle) and
+  Tint, applied in the linear light on the clip's own primaries before every node – as a raw developer's, live while
+  dragging. Works on any log clip; for a MotionCam develop it moves away from the as-shot white. The chip shows "· WB".
+- Storage warning: Settings → Storage → "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (20 by default, or
+  off) – opening a project then says how much the proxies, cache, renders, MCRAW develops and freeze frames take.
+- MCRAW: Malvar–He–Cutler demosaic (gradient-corrected, 5×5) in place of the plain bilinear one – sharper fine
+  detail and fewer colour fringes on edges.
 - Close gaps: hold a track's header → Close gaps moves every clip of the track back to the end of the one before (linked
   sound or picture with it; the space before the first clip stays), one undo. A selected clip has Close gap next to
   Delete: it moves back to the end of the clip before it (or to the start), the clips after it with it; nothing is

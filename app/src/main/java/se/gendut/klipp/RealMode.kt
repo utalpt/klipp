@@ -584,7 +584,9 @@ private class OpenVideos : ActivityResultContracts.OpenMultipleDocuments() {
         }
 }
 
-fun videoRequest() = arrayOf("video/*")
+// Klipp Lab: MotionCam .mcraw and Cinematic RAW Studio .CRAW files too – document providers report them with an
+// unknown or generic MIME type (application/octet-stream), so every file is offered
+fun videoRequest() = arrayOf("*/*")
 
 // ------------------------------------------------------------------ source monitor
 

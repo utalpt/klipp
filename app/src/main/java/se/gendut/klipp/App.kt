@@ -271,7 +271,26 @@ private fun KlippAppContent(
     // release the source decoder only when the source is actually closed (not when the phone rotates)
     LaunchedEffect(sourceMedia) { if (sourceMedia == null) sourcePlayback?.close() }
     // Klipp Lab: with "add to the timeline on import" the clips are on the timeline already – the media panel stays shut
-    val picker = rememberVideoPicker { uris -> controller?.import(uris); if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true }
+    // Klipp Lab: a picked .mcraw is developed into a log clip first (McrawConvert), each clip going in as soon as it is
+    // ready; a picked .CRAW (Cinematic RAW Studio, by matthew777777) is developed by the import itself, with the
+    // settings asked first (CrawDevelopDialog)
+    var mcrawProgress by remember { mutableStateOf<String?>(null) }
+    suspend fun importPicked(picked: List<android.net.Uri>, raw: se.gendut.klipp.engine.CrawSettings = se.gendut.klipp.engine.CrawSettings()) {
+        val uris = importMcraw17u(context, picked, onEach = { controller?.import(it, keepOrder = true, crawSettings = raw) }, craw = raw) { mcrawProgress = it }
+        mcrawProgress = null
+        if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
+    }
+    var pendingCrawImport by remember(controller, controller?.currentId) { mutableStateOf<List<android.net.Uri>?>(null) }
+    fun pick(uris: List<android.net.Uri>) {
+        val c = controller ?: return
+        if (uris.isNotEmpty()) scope.launch { if (c.hasCraw(uris)) pendingCrawImport = uris else importPicked(uris) }
+    }
+    val picker = rememberVideoPicker { uris -> pick(uris) }
+    pendingCrawImport?.let { files ->
+        CrawDevelopDialog(se.gendut.klipp.engine.CrawSettings(), importing = true, onClose = { pendingCrawImport = null }) {
+            scope.launch { importPicked(files, it) }
+        }
+    }
     // Klipp Lab: Klipp's own video picker (previews of log video, newest first); its "Files app" opens the system one
     var videoPicker by remember { mutableStateOf(false) }
     fun openImport() { videoPicker = true }
@@ -336,6 +355,13 @@ private fun KlippAppContent(
             notifyPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
         if (c.snapshot.sequence?.video?.any { it.clips.isNotEmpty() } != true) { toaster.show(Str.t(R.string.app_timeline_empty)); return }
+        // Klipp Lab: MotionCam clips still in their quick (half size) develop: the export waits for the full ones
+        val drafts = c.snapshot.media.count { m -> se.gendut.klipp.engine.McrawStore17u.isDraft(context, c.uriOf(m.id)) }
+        if (drafts > 0) {
+            toaster.show("$drafts MotionCam clip(s) still developing at full size" +
+                (se.gendut.klipp.engine.McrawStore17u.working?.let { " ($it)" } ?: "") + " – export when they're done.")
+            return
+        }
         state.playing = false
         exportAsk = true
     }
@@ -345,9 +371,15 @@ private fun KlippAppContent(
         val c = controller ?: return
         se.gendut.klipp.engine.ExportSettings.save(context, c.currentId, settings)
         lastExportAsk = settings to name
+        // Klipp Lab: HLG with MotionCam clips – the OpenDRT they need goes into their grades (one undo step, seen in Color)
+        if (settings.hlg) {
+            val fix = mcrawHlgGrades17u(context, c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to c.uriOf(it.item) } }, gs)
+            if (fix.isNotEmpty()) gs.setAll(fix)
+        }
         // color-graded clips always become SDR (grading is done in SDR) – except HLG made from the grades' OpenDRT
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
-        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.values, lookOf(grade))) it.copy(hlg = false) else it }
+        val liveIds = c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.map { it.id } }.toSet()
+        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.filterKeys { k -> k in liveIds }.values, lookOf(grade))) it.copy(hlg = false) else it }
         // everything the export reads, taken now: the job outlives this screen (and its controller)
         val snap = c.snapshot
         val uris = c.frozenUris()
@@ -415,6 +447,14 @@ private fun KlippAppContent(
     if (exportAsk && controller != null) {
         val q = controller.snapshot.sequence
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
+        // Klipp Lab: only the clips on the timeline count (grades of deleted clips are kept for undo – as Klipp's own
+        // fix in alpha 241, 2797f03 by Flabbjaxaren), and MotionCam clips with the OpenDRT that choosing HLG gives them
+        val gradesForHlg17u = remember(controller.revision, gs.revision) {
+            val onTimeline = q?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to controller.uriOf(it.item) } }
+            val fix = mcrawHlgGrades17u(context, onTimeline, gs)
+            val ids = onTimeline.map { it.first }.toSet()
+            (gs.grades + fix).filterKeys { it in ids }.values
+        }
         val anyHdr = remember(controller.revision) { se.gendut.klipp.engine.CompositionBuilder.anyHdr(context, controller.snapshot) { controller.uriOf(it) } }
         // 10-bit sources (Auto bit depth follows them) – read from the files, off the main thread
         val anyTen by androidx.compose.runtime.produceState<Boolean?>(null, controller.revision) {
@@ -430,8 +470,9 @@ private fun KlippAppContent(
             // grading is done in SDR (8 bits, gamma) – in an HDR signal it would look wrong
             hdrBlocked = if (graded) stringResource(R.string.app_hdr_blocked) else null,
             anyTenBit = anyTen,
-            hlgReady = hlgReadyOf(gs.grades.values, lookOf(grade)),
-            hlgWhyNot = hlgWhyNot(gs.grades.values, lookOf(grade)),
+            // Klipp Lab: MotionCam clips count as ready – choosing HLG gives them OpenDRT (see runExport)
+            hlgReady = hlgReadyOf(gradesForHlg17u, lookOf(grade)),
+            hlgWhyNot = hlgWhyNot(gradesForHlg17u, lookOf(grade)),
             onDismiss = { exportAsk = false },
         ) { st, name -> exportAsk = false; runExport(st, name) }
     }
@@ -649,7 +690,20 @@ private fun KlippAppContent(
             .put("safeZone", org.json.JSONObject().put("platform", state.safeZone ?: "").put("alpha", state.safeZoneAlpha.toDouble())) }
         // the pieces get the clip's grade as part of the split (undone with it) – no separate color step
         controller.onSplit = { old, fresh -> gs.grades[old]?.let { g -> gs.setAll(fresh.associateWith { g }, record = false) } }
-        controller.onNewClips = { ids -> ids.filter { gs.grades.containsKey(it) }.takeIf { it.isNotEmpty() }?.let { stale -> gs.setAll(stale.associateWith { se.gendut.klipp.engine.ClipGrade() }, record = false) } }
+        controller.onNewClips = { ids ->
+            val added = ids.toSet()
+            val changes = ids.filter { gs.grades.containsKey(it) }.associateWith { se.gendut.klipp.engine.ClipGrade() }.toMutableMap()
+            controller.snapshot.sequence?.video.orEmpty().forEach { track ->
+                for (clip in track.clips) {
+                    if (clip.id !in added) continue
+                    val raw = controller.crawSettings(clip.item) ?: continue
+                    changes[clip.id] = se.gendut.klipp.engine.ClipGrade(nodes = listOf(
+                        se.gendut.klipp.engine.GradeNode(1, drt = se.gendut.klipp.engine.Drt(input = raw.log.key)),
+                    ))
+                }
+            }
+            gs.setAll(changes, record = false)
+        }
         controller.onExtraRestore = { o ->
             gs.load(o.optJSONObject("grades"))
             se.gendut.klipp.engine.RenderCache.renderAll = false
@@ -900,9 +954,10 @@ private fun KlippAppContent(
         @Composable
         fun colorClips(): List<ColorClip> {
             val q = controller?.snapshot?.sequence
-            return remember(q) {
+            val revision = controller?.revision
+            return remember(q, revision) {
                 q?.video?.take(3)?.flatMapIndexed { k, t ->
-                    t.clips.filter { it.text == null }.map { c -> ColorClip(c.id, c.name, c.start.toFloat(), c.end.toFloat(), controller.uriOf(c.item), c.sourceIn, 2 - k, c.speed, c.hold, c.reverse) }
+                    t.clips.filter { it.text == null }.map { c -> ColorClip(c.id, c.name, c.start.toFloat(), c.end.toFloat(), controller.uriOf(c.item), c.sourceIn, 2 - k, c.speed, c.hold, c.reverse, item = c.item) }
                 }.orEmpty().sortedBy { it.start }
             }
         }
@@ -1016,7 +1071,17 @@ private fun KlippAppContent(
                                         transcript = controller?.let { c -> { m: Modifier -> TranscriptView(c, state, m) } },
                                     )
                                     1 -> if (controller != null) {
-                                        ColorPage(state, gs, colorClips(), lookOf(grade), onImportLut = { cb -> lutTarget = cb; lutPicker.launch(arrayOf("*/*")) }) {
+                                        ColorPage(state, gs, colorClips(), lookOf(grade),
+                                            onImportLut = { cb -> lutTarget = cb; lutPicker.launch(arrayOf("*/*")) },
+                                            rawControls = { clip ->
+                                                val raw = controller.crawSettings(clip.item)
+                                                if (raw != null) CrawDevelopButton(raw, controller.busy) { settings ->
+                                                    controller.redevelopCraw(clip.item, settings) { before ->
+                                                        updateCrawGrades(gs, controller.snapshot.sequence, clip.item, before, settings)
+                                                    }
+                                                }
+                                            },
+                                        ) {
                                             ColorPanel(grade, { lutTarget = null; lutPicker.launch(arrayOf("*/*")) }, scroll = false)
                                         }
                                     } else ColorPanel(grade, null)
@@ -1204,16 +1269,24 @@ private fun KlippAppContent(
         ) {
             androidx.activity.compose.BackHandler { videoPicker = false }
             VideoPickerScreen(
-                onImport = { uris ->
+                onImport = { picked ->
                     videoPicker = false
-                    controller?.import(uris, keepOrder = true)
-                    if (uris.isNotEmpty() && !AppPrefs.addOnImport(context)) mediaOpen = true
+                    // Klipp Lab: MotionCam RAW is developed first, in its place in the order; .CRAW asks its settings
+                    pick(picked)
                 },
                 onFilesApp = { videoPicker = false; picker.launch(videoRequest()) },
                 onClose = { videoPicker = false },
             )
         }
 
+        // Klipp Lab: the MotionCam develops' progress, a strip that doesn't block: the clips already in can be edited
+        (mcrawProgress ?: se.gendut.klipp.engine.CrawImport.status)?.let { text ->
+            Text(text, color = K.OnSurface, fontSize = 13.sp, maxLines = 2,
+                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 64.dp, start = 16.dp, end = 16.dp)
+                    .clip(RoundedCornerShape(12.dp)).background(K.SurfaceHigh.copy(alpha = 0.92f)).padding(horizontal = 14.dp, vertical = 8.dp)
+                    .testTag("mcraw:progress"))
+        }
+        Help17uHost() // Klipp Lab: long-press help
         MessageHost(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 70.dp), toaster = toaster, layer = 0)
     }
     }

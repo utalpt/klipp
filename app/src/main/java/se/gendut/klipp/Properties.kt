@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -120,7 +121,8 @@ fun PropSlider(
     Column(Modifier.fillMaxWidth().padding(horizontal = LocalSliderInset.current)) {
         // the name on the left and the value on the right, above the track (the track gets the whole width)
         val nav = anim != null && lane && anim.animated
-        Row(Modifier.fillMaxWidth().height(if (nav) 34.dp else if (anim != null) 28.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        val help = Help17uText.of(tag) // Klipp Lab: long-press help on the name
+        Row(Modifier.fillMaxWidth().then(if (help != null) Modifier.help17u(label, help) else Modifier).height(if (nav) 34.dp else if (anim != null) 28.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
             if (anim != null) Stopwatch(anim)
             Text(
                 label, color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -407,6 +409,7 @@ internal fun SheetHeader(title: String, subtitle: String? = null, onDone: () -> 
  * so that half a tool shows at the edge (and fades): there is more. The selected one is kept in view.
  * [dense] = the color page's rail: the tools close together, the selected one's name in the text color.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ToolRail(tabs: List<ToolTab>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, dense: Boolean = false) {
     val haptics = rememberHaptics()
@@ -429,7 +432,8 @@ internal fun ToolRail(tabs: List<ToolTab>, selected: Int, onSelect: (Int) -> Uni
                 val name by animateColorAsState(if (on && dense) K.OnSurface else if (on) K.PrimarySoft else K.OnSurfaceVar, label = "rn")
                 Column(
                     Modifier.width(76.dp).height(each).inViewWhen(on, each / 2, horizontal = false)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { if (!on) haptics.tick(); onSelect(i) }
+                        .combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab,
+                            onLongClick = onLongHelp17u(t.label, Help17uText.of(t.tag))) { if (!on) haptics.tick(); onSelect(i) }
                         .semantics { this.selected = on }
                         .testTag(t.tag),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,

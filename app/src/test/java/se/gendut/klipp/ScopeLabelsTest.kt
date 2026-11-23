@@ -26,6 +26,14 @@ class ScopeLabelsTest {
         rule.waitForIdle()
         rule.onNodeWithTag("set:renderAuto").performScrollTo()
         rule.onNodeWithText("Rendera automatiskt (alla projekt)").assertExists()
+    }
+
+    /** Klipp Lab: deleting the renders is on the Storage page, with the app's other files. */
+    @Test fun deletingTheRendersIsOnTheStoragePage() {
+        rule.setContent { KlippTheme { SettingsScreen(onClose = {}) } }
+        rule.waitForIdle()
+        rule.onNodeWithTag("set:cat:storage").performClick()
+        rule.waitForIdle()
         rule.onNodeWithText("Ta bort renderingar (alla projekt)").performScrollTo()
     }
 

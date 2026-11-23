@@ -119,17 +119,30 @@ jobs:
         run: |
           ./gradlew --build-cache assembleRelease
           mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/klipp17u-${{ steps.ver.outputs.version }}.apk"
+      # (a private repository – the test builds' – has a small artifact quota: its APK goes to a prerelease instead)
       - uses: actions/upload-artifact@v7
+        if: ${{ !github.event.repository.private }}
         with:
           name: klipp17u-${{ github.sha }}
           path: out/*.apk
           retention-days: 14
+      # Klipp Lab: in the private test repository the APK is the `test-build` prerelease (release files don't count
+      # against the artifact quota); klipp-build.ps1 downloads it from there when the release is of this commit
+      - name: Test build prerelease (private repository)
+        if: github.event.repository.private && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/test/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/*.apk klipp17u-test.apk
+          gh release delete test-build --cleanup-tag --yes || true
+          gh release create test-build klipp17u-test.apk --prerelease --target "$GITHUB_SHA" \
+            --title "Test build" --notes "CI build of ${GITHUB_SHA} (${{ steps.ver.outputs.version }}), branch ${GITHUB_REF_NAME}."
       # the tests on debug: the Compose test rule needs debug's test activity (ui-test-manifest is debug only)
       - name: Unit tests (OpenDRT, export plan)
         if: ${{ !(github.event.inputs.skip_tests == 'true' || contains(github.event.head_commit.message, '[skip tests]')) || startsWith(github.ref, 'refs/tags/') }}
         run: ./gradlew --build-cache testDebugUnitTest --tests 'se.gendut.klipp.OpenDrtTest' --tests 'se.gendut.klipp.ExportPlanTest'
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ failure() && !github.event.repository.private }}
         with:
           name: test-reports
           path: app/build/reports/tests/

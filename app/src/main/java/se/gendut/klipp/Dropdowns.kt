@@ -3,6 +3,7 @@ package se.gendut.klipp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ class Opt<T>(val value: T, val label: String, val hint: String? = null, val enab
  *
  * Test tags: the field [tag], the options "[tag]:key".
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun <T> DropField(
     label: String?, options: List<Opt<T>>, selected: T, tag: String,
@@ -49,14 +51,16 @@ fun <T> DropField(
     var open by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
     val cur = options.firstOrNull { it.value == selected }
+    val help = Help17uText.of(tag) // Klipp Lab: long-press help
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        if (label != null) Text(label, color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        if (label != null) Text(label, color = K.OnSurfaceVar, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            modifier = (if (help != null) Modifier.help17u(label, help) else Modifier).padding(top = 6.dp, bottom = 4.dp))
         Box {
             val shape = RoundedCornerShape(12.dp)
             Row(
                 Modifier.fillMaxWidth().clip(shape).background(K.SurfaceHighest)
                     .border(1.dp, if (open) K.Primary else K.OutlineVar, shape)
-                    .clickable(onClickLabel = label) { haptics.tick(); open = true }
+                    .combinedClickable(onClickLabel = label, onLongClick = onLongHelp17u(label ?: "", help)) { haptics.tick(); open = true }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
                     .testTag(tag),
                 verticalAlignment = Alignment.CenterVertically,

@@ -22,8 +22,68 @@ object Mcraw {
     @JvmStatic private external fun nativeDecode(h: Long, index: Int): Long
     @JvmStatic private external fun nativeLastBytes(h: Long): Long
     @JvmStatic private external fun nativePreview(h: Long, out: IntArray, w: Int, h2: Int): Boolean
+    @JvmStatic private external fun nativeDecodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String?
+    @JvmStatic private external fun nativeLastLitRow(h: Long): Int
+    @JvmStatic private external fun nativeEmptyBottomRows(h: Long, limit: Int): Int
+    @JvmStatic private external fun nativeLoadAudio(h: Long): Long
+    @JvmStatic private external fun nativeAudioStart(h: Long): Long
+    @JvmStatic private external fun nativeAudioCopy(h: Long, out: ShortArray)
+
+    /** All the file's sound, interleaved 16-bit, and the time (ns, the frames' clock) of its first sample; null when none. */
+    internal fun audio(h: Long): Pair<ShortArray, Long>? {
+        val n = nativeLoadAudio(h)
+        if (n <= 0 || n > Int.MAX_VALUE) return null
+        val out = ShortArray(n.toInt())
+        nativeAudioCopy(h, out)
+        return out to nativeAudioStart(h)
+    }
+
+    // for McrawConvert
+    internal fun open(fd: Int): Long = nativeOpen(fd)
+    internal fun close(h: Long) = nativeClose(h)
+    internal fun info(h: Long): String = nativeInfo(h)
+    internal fun decodeTo(h: Long, index: Int, out: java.nio.ByteBuffer): String? = nativeDecodeTo(h, index, out)
+    /** Padding rows at the bottom of the frame last decoded with [decodeTo] (all at or under [limit]). */
+    internal fun emptyBottomRows(h: Long, limit: Int): Int = nativeEmptyBottomRows(h, limit)
 
     class Probe(val summary: String, val log: String, val preview: Bitmap?, val logFile: File?)
+
+    /** A picker card's preview (the middle frame, padding rows cut off) and what the file is. */
+    class Thumb(val bitmap: Bitmap?, val width: Int, val height: Int, val fps: Double, val seconds: Double)
+
+    fun thumb(ctx: Context, uri: Uri): Thumb? {
+        if (!available) return null
+        val pfd = runCatching { ctx.contentResolver.openFileDescriptor(uri, "r") }.getOrNull() ?: return null
+        val h = nativeOpen(pfd.fd)
+        if (h == 0L) { pfd.close(); return null }
+        try {
+            val info = JSONObject(nativeInfo(h))
+            val frames = info.optJSONArray("frames") ?: return null
+            val n = frames.length()
+            if (n == 0) return null
+            val ff = info.optJSONObject("firstFrame") ?: JSONObject()
+            val w = ff.optInt("width"); var hh = ff.optInt("height")
+            val dur = if (n > 1) (frames.getLong(n - 1) - frames.getLong(0)) / 1e9 else 0.0
+            val fps = if (dur > 0) (n - 1) / dur else 0.0
+            var bmp: Bitmap? = null
+            if (nativeDecode(h, n / 2) >= 0 && w > 0 && hh > 0) {
+                val black = info.optJSONObject("container")?.optJSONArray("blackLevel")
+                val limit = (black?.let { a -> (0 until a.length()).maxOf { a.getDouble(it) } } ?: 0.0).toInt() + 1
+                val empty = nativeEmptyBottomRows(h, limit)
+                val ch = if (empty >= hh / 20) hh - empty else hh
+                val pw = 320; val ph = (pw.toLong() * hh / w).toInt().coerceAtLeast(1)
+                val px = IntArray(pw * ph)
+                if (nativePreview(h, px, pw, ph)) {
+                    val full = Bitmap.createBitmap(px, pw, ph, Bitmap.Config.ARGB_8888)
+                    bmp = Bitmap.createBitmap(full, 0, 0, pw, (ph.toLong() * ch / hh).toInt().coerceIn(1, ph))
+                }
+                hh = ch
+            }
+            return Thumb(bmp, w, hh, fps, dur + if (fps > 0) 1 / fps else 0.0)
+        } catch (_: Throwable) {
+            return null
+        } finally { nativeClose(h); pfd.close() }
+    }
 
     /** Runs the test on [uri]; [progress] gets 0..1. Blocking: call off the main thread. */
     fun probe(ctx: Context, uri: Uri, progress: (Float) -> Unit): Probe {
@@ -103,6 +163,7 @@ object Mcraw {
             val mid = n / 2
             var bmp: Bitmap? = null
             if (nativeDecode(h, mid) >= 0 && w > 0 && hh > 0) {
+                line("middle frame: last row with picture ${nativeLastLitRow(h)} of ${hh - 1}")
                 val pw = 960.coerceAtMost(w / 2); val ph = (pw.toLong() * hh / w).toInt().coerceAtLeast(1)
                 val px = IntArray(pw * ph)
                 if (nativePreview(h, px, pw, ph)) bmp = Bitmap.createBitmap(px, pw, ph, Bitmap.Config.ARGB_8888)

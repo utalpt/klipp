@@ -19,6 +19,10 @@
     <string name="colorpage_input_intro">Hur klippet spelades in, före dess noder: en annan EI skalar ljuset som på en filmkamera, så att alla noder, LUT:ar och OpenDRT får det bedömda materialet.</string>
     <string name="colorpage_input_curve">Log-kurva</string>
     <string name="colorpage_input_all">Samma EI för alla klipp</string>
+    <string name="colorpage17u_wb_note">Vitbalans, i det linjära ljuset före noderna (som i en raw-framkallare). Som fotograferat = klippet som det är; lägre K = kallare.</string>
+    <string name="colorpage17u_wb_temp">Temperatur</string>
+    <string name="colorpage17u_wb_tint">Ton</string>
+    <string name="colorpage17u_wb_as_shot">Som fotograferat</string>
     <string name="colortools_ei_shot">Inspelad med EI</string>
     <string name="colortools_ei_rate">Bedömd som EI</string>
     <string name="colortools_ei_off">Av</string>
@@ -259,4 +263,12 @@
     <string name="lutbrowser_delete_title">Ta bort %1$d LUT:ar?</string>
     <string name="lutbrowser_delete_text">Klipp som använder dem behåller namnet och visar LUT:en som saknad tills den importeras igen.</string>
     <string name="lutbrowser_hint">Håll på en LUT för att välja flera (tryck sedan på ett gruppnamn för hela gruppen)</string>
+    <string name="craw_develop_settings">CRAW-framkallning</string>
+    <string name="craw_develop_log">Loggprofil</string>
+    <string name="craw_develop_ei">Exponeringsindex (EI)</string>
+    <string name="craw_develop_auto">Auto (som filmat)</string>
+    <string name="craw_develop_again">Framkalla igen</string>
+    <string name="craw_developing">Framkallar CRAW…</string>
+    <string name="craw_developed">CRAW-framkallningen har uppdaterats</string>
+    <string name="craw_develop_import">Framkalla och importera</string>
 </resources>

@@ -19,6 +19,10 @@
     <string name="colorpage_input_intro">How the clip was recorded, applied before its nodes: rating at another EI scales the light as on a cinema camera, so every node, LUT and OpenDRT gets the rated footage.</string>
     <string name="colorpage_input_curve">Log curve</string>
     <string name="colorpage_input_all">Same EI for all clips</string>
+    <string name="colorpage17u_wb_note">White balance, in the linear light before the nodes (as in a raw developer). As shot = the clip as it is; lower K = cooler.</string>
+    <string name="colorpage17u_wb_temp">Temperature</string>
+    <string name="colorpage17u_wb_tint">Tint</string>
+    <string name="colorpage17u_wb_as_shot">As shot</string>
     <string name="colortools_ei_shot">Shot at EI</string>
     <string name="colortools_ei_rate">Rated at EI</string>
     <string name="colortools_ei_off">Off</string>
@@ -259,4 +263,12 @@
     <string name="lutbrowser_delete_title">Delete %1$d LUTs?</string>
     <string name="lutbrowser_delete_text">Clips that use them keep the name and show the LUT as missing until it is imported again.</string>
     <string name="lutbrowser_hint">Hold a LUT to select several (then tap a group name for the whole group)</string>
+    <string name="craw_develop_settings">CRAW development</string>
+    <string name="craw_develop_log">Log profile</string>
+    <string name="craw_develop_ei">Exposure index (EI)</string>
+    <string name="craw_develop_auto">Auto (as shot)</string>
+    <string name="craw_develop_again">Develop again</string>
+    <string name="craw_developing">Developing CRAW…</string>
+    <string name="craw_developed">CRAW development updated</string>
+    <string name="craw_develop_import">Develop and import</string>
 </resources>

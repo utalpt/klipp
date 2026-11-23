@@ -341,9 +341,40 @@ class WindowTrack(
  * the sensor clips at 0.0072 × EI scene linear (their gamma tables are slog3(0.0072·EI·s), from his RawViewer):
  * log2(EI / 25) stops over 18 % grey.
  */
-data class InputEi(val input: String = OpenDrt.Input.SLOG3.key, val shot: Int = 0, val rated: Int = 0) {
+data class InputEi(
+    val input: String = OpenDrt.Input.SLOG3.key, val shot: Int = 0, val rated: Int = 0,
+    /** White balance in the linear light, before the nodes: the light's colour temperature in K (0 = as shot) … */
+    val temp: Int = 0,
+    /** … and tint, -100 (green) to +100 (magenta). */
+    val tint: Int = 0,
+) {
     val gain: Float get() = if (shot > 0 && rated > 0) rated.toFloat() / shot else 1f
-    val active: Boolean get() = kotlin.math.abs(gain - 1f) > 1e-4f
+    val hasWb: Boolean get() = temp > 0 && temp != WB_REF || tint != 0
+    val active: Boolean get() = kotlin.math.abs(gain - 1f) > 1e-4f || hasWb
+
+    /**
+     * Klipp Lab: the white balance as gains on the clip's own primaries (von Kries): a light of [temp] K is made as
+     * neutral as one of 6500 K was – lower = cooler picture, as in a raw developer. The as-shot white of the clip (a
+     * MotionCam develop is already balanced as shot) is 6500 K here, so the slider moves away from as shot. Luminance
+     * is kept. Tint: the green gain, ±½ stop at ±100.
+     */
+    fun wbGains(): FloatArray {
+        if (!hasWb) return floatArrayOf(1f, 1f, 1f)
+        val toXyz = OpenDrt.Input.of(input).gamut
+        val fromXyz = inv3(toXyz)
+        fun rgbOf(k: Int): FloatArray {
+            val (x, y) = planckXy(k.toDouble())
+            val xyz = floatArrayOf((x / y).toFloat(), 1f, ((1 - x - y) / y).toFloat())
+            return FloatArray(3) { r -> fromXyz[r * 3] * xyz[0] + fromXyz[r * 3 + 1] * xyz[1] + fromXyz[r * 3 + 2] * xyz[2] }
+        }
+        val ref = rgbOf(WB_REF)
+        val t = rgbOf(if (temp > 0) temp else WB_REF)
+        val g = FloatArray(3) { ref[it] / t[it] }
+        g[1] *= Math.pow(2.0, -tint / 200.0).toFloat()
+        val y = toXyz[3] * g[0] + toXyz[4] * g[1] + toXyz[5] * g[2]
+        val yWhite = toXyz[3] + toXyz[4] + toXyz[5]
+        return FloatArray(3) { g[it] * yWhite / y }
+    }
 
     /** Stops of the sensor's clip over 18 % grey at the EI in use (rated, else shot); null = no EI set. */
     val clipStops: Float? get() = (if (rated > 0 && shot > 0) rated else shot).takeIf { it > 0 }?.let { kotlin.math.log2(it / 25f) }
@@ -352,21 +383,49 @@ data class InputEi(val input: String = OpenDrt.Input.SLOG3.key, val shot: Int = 
     fun tables(): Array<FloatArray> {
         val tf = OpenDrt.Input.of(input).oetf
         val g = gain
-        val t = FloatArray(GradeNode.CURVE_N) { i -> OpenDrt.encode(OpenDrt.oetf(GradeNode.curveX(i), tf) * g, tf) }
-        return arrayOf(t, t.copyOf(), t.copyOf())
+        val wb = wbGains()
+        return Array(3) { c -> FloatArray(GradeNode.CURVE_N) { i -> OpenDrt.encode(OpenDrt.oetf(GradeNode.curveX(i), tf) * g * wb[c], tf) } }
     }
 
     fun toJson(): JSONObject = JSONObject().put("in", input).put("shot", shot).put("rated", rated)
+        .apply { if (temp > 0) put("temp", temp); if (tint != 0) put("tint", tint) }
 
     companion object {
         /** EIs to pick from (one-third stops). */
         val EIS = listOf(100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800)
         /** The input node's id in [ClipGrade.chain] (nodes are numbered from 1). */
         const val NODE_ID = -100
+        /** The white balance's reference: the clip as it is (as shot). */
+        const val WB_REF = 6500
 
         fun fromJson(o: JSONObject?): InputEi? = o?.let {
             InputEi(OpenDrt.Input.of(it.optString("in", OpenDrt.Input.SLOG3.key)).key,
-                it.optInt("shot", 0).coerceIn(0, 102_400), it.optInt("rated", 0).coerceIn(0, 102_400))
+                it.optInt("shot", 0).coerceIn(0, 102_400), it.optInt("rated", 0).coerceIn(0, 102_400),
+                it.optInt("temp", 0).let { k -> if (k == 0) 0 else k.coerceIn(2000, 15000) }, it.optInt("tint", 0).coerceIn(-100, 100))
+        }
+
+        /** The Planckian locus (Kim et al. 2002 cubic fit, 1667–25000 K): CIE 1931 xy of a black body at [k] K. */
+        fun planckXy(k: Double): Pair<Double, Double> {
+            val t = k.coerceIn(1667.0, 25000.0)
+            val x = if (t <= 4000) -0.2661239e9 / (t * t * t) - 0.2343589e6 / (t * t) + 0.8776956e3 / t + 0.179910
+            else -3.0258469e9 / (t * t * t) + 2.1070379e6 / (t * t) + 0.2226347e3 / t + 0.240390
+            val y = when {
+                t <= 2222 -> -1.1063814 * x * x * x - 1.34811020 * x * x + 2.18555832 * x - 0.20219683
+                t <= 4000 -> -0.9549476 * x * x * x - 1.37418593 * x * x + 2.09137015 * x - 0.16748867
+                else -> 3.0817580 * x * x * x - 5.87338670 * x * x + 3.75112997 * x - 0.37001483
+            }
+            return x to y
+        }
+
+        private fun inv3(m: FloatArray): FloatArray {
+            val a = m.map { it.toDouble() }
+            val c0 = a[4] * a[8] - a[5] * a[7]; val c1 = a[5] * a[6] - a[3] * a[8]; val c2 = a[3] * a[7] - a[4] * a[6]
+            val d = a[0] * c0 + a[1] * c1 + a[2] * c2
+            return floatArrayOf(
+                (c0 / d).toFloat(), ((a[2] * a[7] - a[1] * a[8]) / d).toFloat(), ((a[1] * a[5] - a[2] * a[4]) / d).toFloat(),
+                (c1 / d).toFloat(), ((a[0] * a[8] - a[2] * a[6]) / d).toFloat(), ((a[2] * a[3] - a[0] * a[5]) / d).toFloat(),
+                (c2 / d).toFloat(), ((a[1] * a[6] - a[0] * a[7]) / d).toFloat(), ((a[0] * a[4] - a[1] * a[3]) / d).toFloat(),
+            )
         }
     }
 }

@@ -13,6 +13,7 @@ notices are in **`LICENSES/`** and ship inside the app (Settings → About → L
 |---|---|---|---|
 | **Media3 effect, transformer, ExoPlayer** 1.11.1 – © The Android Open Source Project; Klipp's added files © The Klipp contributors | `third_party/media3-*` (classes.dex) | Apache-2.0 | Modified: 18 files (marked "Modified for Klipp") and 9 added (7 Klipp's own, 2 derived from Media3 files) – see each module's `KLIPP.md` |
 | **whisper.cpp** 1.9.4 and **ggml** – © The ggml authors; YaRN code © Jeffrey Quesnelle and Bowen Peng | `third_party/whisper.cpp` → `libklipp_whisper.so` | MIT (`LICENSES/third-party/whisper.cpp/`) | Trimmed to the CPU backend; one added function – see `KLIPP.md` |
+| **Cinematic RAW Studio Decoder** (cff9a90) – © The Cinematic RAW Studio Authors | `third_party/craw` → `libklipp_craw.so` | Apache-2.0 (`LICENSES/repo/third_party/craw/`) | None |
 | **FilmCraft** engine (`filmcraft-*`, pinned commit in `rust/Cargo.toml`) – © ArtCraft Team and the FilmCraft contributors | `libklipp_bridge.so` | MIT OR Apache-2.0 (+ `NOTICE`) | None |
 | **craft-libs** (`craft-media`, `craft-docpath`) – © ArtCraft Team and the craft-libs contributors | `libklipp_bridge.so` | MIT OR Apache-2.0 (+ `NOTICE`) | None |
 | **DeepFilterNet** (`deep_filter`, libDF) and its **DeepFilterNet3 model**, pinned commit in `rust/Cargo.toml` – © Hendrik Schröter and the DeepFilterNet contributors; inference with **tract** 0.21.4 (github.com/sonos/tract) – © the tract authors | `libklipp_bridge.so` (the model compiled in) – the rendered noise reduction and speech enhance | MIT OR Apache-2.0 (code and model; `LICENSES/third-party/rust/deep_filter-*/`) | None |
@@ -26,7 +27,9 @@ notices are in **`LICENSES/`** and ship inside the app (Settings → About → L
 | **Checker Framework qualifiers** 3.43.0 – © the Checker Framework developers | classes.dex | MIT (`LICENSES/third-party/maven/checker-qual-LICENSE.txt`) | None |
 | **spektrafilm** (code) – © Andrea Volpato et al. | ported to `engine/Spektra.kt`, `engine/FilmFx.kt`, `engine/FilmGl.kt` | GPL v3 ("GPLv3"; its CITATION.cff says or-later; Klipp uses it under version 3) | Ported to Kotlin/GLSL |
 | **OpenDRT** v1.1.0 – Jed Smith | ported to `engine/OpenDrt.kt` | GPL v3 ("License: GPLv3" in its notice; Klipp uses it under version 3) | Ported; SDR, and in Klipp Lab its Rec.2100 HLG encoding; two inputs added |
-| **motioncam-decoder** (commit b931ec0, github.com/mirsadm/motioncam-decoder) – © MotionCam | fetched by `app/src/main/cpp/CMakeLists.txt` → `libklipp_mcraw.so` (Klipp Lab: reading MotionCam .mcraw) | Apache-2.0 | None |
+| **motioncam-decoder** (commit b931ec0, github.com/mirsadm/motioncam-decoder) – © MotionCam | fetched by `app/src/main/cpp/CMakeLists.txt` → `libklipp_mcraw.so` (Klipp Lab: reading MotionCam .mcraw) | Apache-2.0 (`LICENSES/third-party/motioncam-decoder/LICENSE`) | None |
+| **JSON for Modern C++** 3.11.3 – © 2013-2023 Niels Lohmann (in motioncam-decoder's `thirdparty/nlohmann`) | `libklipp_mcraw.so` | MIT (`LICENSES/third-party/motioncam-decoder/nlohmann-json-LICENSE.txt`) | None |
+| **SIMDe** – © Evan Nemerson and the SIMDe contributors (in motioncam-decoder's `thirdparty/simde`, SSE2/SSE4.1 headers) | `libklipp_mcraw.so` | MIT (`LICENSES/third-party/motioncam-decoder/simde-LICENSE.txt`) | None |
 
 ## Data and fonts in the app (assets)
 
