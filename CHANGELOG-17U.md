@@ -76,6 +76,9 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- MCRAW develop: the frames are decoded on two threads (one was the limit: 13 ms a frame, 21-27 ms with other work
+  beside it), and proxies wait while the full develops of a Quick import run in the background (they competed for the
+  same reads, GPU and encoder), then follow.
 - MCRAW Quick import (picker chip, on by default): each .mcraw is first developed at half size (each 2×2 CFA block one
   pixel, no demosaic) so the clips can be edited sooner; the full develop follows in the background, one clip at a
   time, and takes the draft's place when done (shown in the clip's RAW settings). A project opened again finishes what

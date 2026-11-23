@@ -194,28 +194,36 @@ object McrawConvert {
             val tDecode = java.util.concurrent.atomic.AtomicLong(0)
             var tWait = 0L; var tDraw = 0L; var tSwap = 0L; var tDrain = 0L; var uploadNs = 0L
             val bytes = w * hh * 2
-            // decoded frames, in order, from a second thread (three buffers in flight)
+            // Klipp Lab: decoded frames, in order, from READERS threads, each with its own handle on the file: thread t
+            // decodes frames t, t + READERS, … into its own queue, and the frames are taken from the queues in turn.
+            // One decode thread was the limit (13 ms a frame, 21-27 ms with other work running). Buffers: each thread
+            // holds at most one queued and one being decoded, plus the one being drawn.
             class Frame(val index: Int, val buf: ByteBuffer, val meta: JSONObject?)
-            val free = ArrayBlockingQueue<ByteBuffer>(3).apply { repeat(3) { add(ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN)) } }
-            val ready = ArrayBlockingQueue<Frame>(3)
+            val nBuf = READERS * 2 + 1
+            val free = ArrayBlockingQueue<ByteBuffer>(nBuf).apply { repeat(nBuf) { add(ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN)) } }
+            val readyQ = List(READERS) { ArrayBlockingQueue<Frame>(1) }
             val stop = java.util.concurrent.atomic.AtomicBoolean(false)
-            val reader = Thread {
-                val rp = ctx.contentResolver.openFileDescriptor(src, "r")
-                val rh = rp?.let { Mcraw.open(it.fd) } ?: 0L
-                try {
-                    for (i in 0 until n) {
-                        if (stop.get()) break
-                        val b = free.take()
-                        val td = System.nanoTime()
-                        val m = if (rh != 0L) Mcraw.decodeTo(rh, i, b) else null
-                        tDecode.addAndGet(System.nanoTime() - td)
-                        ready.put(Frame(i, b, m?.let { JSONObject(it) }))
-                    }
-                } catch (_: InterruptedException) {
-                } catch (e: Throwable) {
-                    android.util.Log.e("KlippMcraw", "reader", e)
-                } finally { if (rh != 0L) Mcraw.close(rh); rp?.close() }
-            }.apply { this.name = "mcraw-read"; start() }
+            val readers = List(READERS) { t ->
+                Thread {
+                    val rp = ctx.contentResolver.openFileDescriptor(src, "r")
+                    val rh = rp?.let { Mcraw.open(it.fd) } ?: 0L
+                    try {
+                        var i = t
+                        while (i < n) {
+                            if (stop.get()) break
+                            val b = free.take()
+                            val td = System.nanoTime()
+                            val m = if (rh != 0L) Mcraw.decodeTo(rh, i, b) else null
+                            tDecode.addAndGet(System.nanoTime() - td)
+                            readyQ[t].put(Frame(i, b, m?.let { JSONObject(it) }))
+                            i += READERS
+                        }
+                    } catch (_: InterruptedException) {
+                    } catch (e: Throwable) {
+                        android.util.Log.e("KlippMcraw", "reader", e)
+                    } finally { if (rh != 0L) Mcraw.close(rh); rp?.close() }
+                }.apply { this.name = "mcraw-read-$t"; start() }
+            }
 
             var encoded = 0
             var failed = 0
@@ -270,7 +278,7 @@ object McrawConvert {
                     gl.wbCam = wbCam
                     for (k in 0 until n) {
                         var t = System.nanoTime()
-                        val f = ready.poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
+                        val f = readyQ[k % READERS].poll(20, java.util.concurrent.TimeUnit.SECONDS) ?: error("reading the frames stopped at $k")
                         var t2 = System.nanoTime(); tWait += t2 - t; t = t2
                         if (f.meta == null) { failed++; free.put(f.buf); continue }
                         gl.drawFrame(f.buf, f.meta, c)
@@ -299,13 +307,13 @@ object McrawConvert {
                 muxer.release()
             } finally {
                 stop.set(true)
-                reader.interrupt(); reader.join(2000)
+                readers.forEach { it.interrupt() }; readers.forEach { it.join(2000) }
                 soundThread.join(30_000) // it reads the file's handle, closed after this
                 outPfd.close()
             }
             val secs = (System.nanoTime() - tStart) / 1e9
             val per = encoded.coerceAtLeast(1) * 1e6
-            line("per frame (ms): decode ${"%.1f".format(tDecode.get() / per)} (reader thread) · wait ${"%.1f".format(tWait / per)} · " +
+            line("per frame (ms): decode ${"%.1f".format(tDecode.get() / per)} (each, on $READERS threads) · wait ${"%.1f".format(tWait / per)} · " +
                 "upload+draw ${"%.1f".format(tDraw / per)} (upload ${"%.1f".format(uploadNs / per)}) · swap ${"%.1f".format(tSwap / per)} · drain ${"%.1f".format(tDrain / per)}")
             line("total with the steps before: ${"%.1f".format((System.nanoTime() - tCall) / 1e9)} s")
             if (part != null) { if (!part.renameTo(outFile!!)) error("could not write ${outFile.name}") }
@@ -328,6 +336,9 @@ object McrawConvert {
     }
 
     private fun ms(ns: Long) = ns / 1_000_000
+
+    /** Klipp Lab: threads decoding the .mcraw's frames (each with its own handle). */
+    private const val READERS = 2
 
     /**
      * Klipp Lab: every develop adds its log to Android/data/<app>/files/mcraw_log.txt (newest last, kept under ~1 MB),

@@ -264,9 +264,16 @@ object Proxies {
         se.gendut.klipp.CrashReport.note("proxy stopped for the export: ${job?.uri?.lastPathSegment}")
     }
 
+    /**
+     * Klipp Lab: proxies wait while MotionCam develops run in the background (they share the file reads, the GPU and
+     * the encoder: the develops' decode went from 13 to 21-27 ms a frame with proxies made beside them).
+     */
+    @Volatile private var held = false
+    fun hold(on: Boolean) { held = on; if (!on) main.post { next() } }
+
     private fun next() {
         val c = app ?: return
-        if (running != null || BackgroundWork.exporting) return
+        if (running != null || BackgroundWork.exporting || held) return
         val job = queue.removeFirstOrNull() ?: return
         val u = job.uri
         val k = key(u)

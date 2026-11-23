@@ -142,7 +142,7 @@ object McrawStore17u {
         val app = c.applicationContext
         for (u in uris) {
             if (!isDraft(app, u) || !queued.add(u.toString())) continue
-            drafts++
+            if (drafts++ == 0) Proxies.hold(true)
             bg.launch {
                 // a moment first: the import that brought the draft in is still adding it to the project
                 kotlinx.coroutines.delay(1500)
@@ -160,6 +160,7 @@ object McrawStore17u {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (info != null) working = null
                         drafts = (drafts - 1).coerceAtLeast(0)
+                        if (drafts == 0) Proxies.hold(false)
                         queued.remove(u.toString())
                         if (r?.uri != null) relink?.invoke(u, r.uri)
                     }
