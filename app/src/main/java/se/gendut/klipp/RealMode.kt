@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -851,21 +852,97 @@ fun ScrubBar(
 @Composable
 fun ExportOverlay(progress: Int?, modifier: Modifier = Modifier, onCancel: () -> Unit = {}) {
     AnimatedVisibility(progress != null, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }, contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().background(Color(0xE6000000)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }, contentAlignment = Alignment.Center) {
+            // Klipp Lab: the end of an edit gets its own moment - a ring that fills with the export, the percentage
+            // large in its middle, what is being made, and the time spent, the time left and the speed
             Column(
-                Modifier.padding(32.dp).clip(RoundedCornerShape(28.dp)).background(K.Surface).padding(24.dp),
+                Modifier.padding(28.dp).widthIn(max = 340.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(K.Surface)
+                    .padding(horizontal = 24.dp, vertical = 26.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(stringResource(R.string.realmode_exporting), color = K.OnSurface, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(16.dp))
-                val p by animateFloatAsState((progress ?: 0) / 100f, spring(1f, 200f), label = "ep")
-                WavyProgress(p, Modifier.width(240.dp).height(20.dp))
-                Spacer(Modifier.height(10.dp))
-                Text("${progress ?: 0} %", color = K.OnSurfaceVar, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.realmode_exporting).uppercase(), color = K.Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                val job = se.gendut.klipp.engine.ExportJobs.status
+                job?.name?.let { n ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(n, color = K.OnSurface, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                se.gendut.klipp.engine.ExportJobs.summary.takeIf { it.isNotEmpty() }?.let { sum ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(sum, color = K.OnSurfaceVar, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.height(22.dp))
+                val pc = progress ?: 0
+                val p by animateFloatAsState(pc / 100f, spring(1f, 120f), label = "ep")
+                Box(Modifier.size(184.dp), contentAlignment = Alignment.Center) {
+                    ExportRing(p, Modifier.fillMaxSize())
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("$pc", color = K.OnSurface, fontSize = 54.sp, fontWeight = FontWeight.ExtraBold,
+                            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+                        Text("%", color = K.OnSurfaceVar, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 11.dp, start = 2.dp))
+                    }
+                }
+                Spacer(Modifier.height(22.dp))
+                // time spent, time left (from the pace so far) and frames per second, once a second
+                // (the start is the export's own, not this screen's: leaving the app and coming back keeps the real time)
+                val active = progress != null
+                var now by remember { mutableStateOf(System.nanoTime()) }
+                LaunchedEffect(active) {
+                    while (active) { now = System.nanoTime(); kotlinx.coroutines.delay(1000) }
+                }
+                val t0 = se.gendut.klipp.engine.ExportJobs.startedNs
+                val sec = if (t0 > 0) (now - t0) / 1e9 else 0.0
+                fun mmss(s: Double) = "%d:%02d".format(s.toInt() / 60, s.toInt() % 60)
+                val frames = se.gendut.klipp.engine.ExportJobs.frames
+                val left = if (pc in 2..99 && sec >= 1) mmss(sec * (100 - pc) / pc) else "–"
+                val fps = if (frames > 0 && pc >= 1 && sec >= 2) "%.0f".format(frames * pc / 100.0 / sec) else "–"
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(K.OnSurface.copy(alpha = 0.06f)).padding(vertical = 12.dp)
+                    .testTag("export:pace"), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    ExportStat("Elapsed", if (sec >= 1) mmss(sec) else "0:00")
+                    ExportStat("Left", left)
+                    ExportStat("Speed", if (fps == "–") fps else "$fps fps")
+                }
+                Spacer(Modifier.height(14.dp))
                 // stops the export itself (it runs on whether this screen stays or not)
                 FlatTextButton(onClick = onCancel, modifier = Modifier.testTag("exportCancel")) { Text(stringResource(R.string.app_cancel)) }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExportStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = K.OnSurface, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+        Text(label.uppercase(), color = K.OnSurfaceVar, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.sp)
+    }
+}
+
+/** Klipp Lab: the export's ring - a faint track, the done part in the accent with a soft glow, and a light that runs along it. */
+@Composable
+private fun ExportRing(p: Float, modifier: Modifier) {
+    var phase by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) { while (true) { withFrameNanos { phase = (it / 1e9f * 0.6f) % 1f } } }
+    Canvas(modifier) {
+        val stroke = 12.dp.toPx()
+        val inset = stroke / 2 + 6.dp.toPx()
+        val tl = Offset(inset, inset)
+        val sz = Size(size.width - 2 * inset, size.height - 2 * inset)
+        val cap = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawArc(K.Primary.copy(alpha = 0.14f), 0f, 360f, false, tl, sz, style = cap)
+        val sweep = 360f * p.coerceIn(0f, 1f)
+        if (sweep > 0.5f) {
+            // the glow under it
+            drawArc(K.Primary.copy(alpha = 0.18f), -90f, sweep, false, tl, sz,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(stroke * 2.2f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            drawArc(K.Primary, -90f, sweep, false, tl, sz, style = cap)
+            // a light running along the done part
+            val a = Math.toRadians((-90f + sweep * phase).toDouble())
+            val r = sz.width / 2
+            val c = Offset(size.width / 2 + (r * kotlin.math.cos(a)).toFloat(), size.height / 2 + (r * kotlin.math.sin(a)).toFloat())
+            drawCircle(Color.White.copy(alpha = 0.55f), stroke * 0.32f, c)
         }
     }
 }

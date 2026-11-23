@@ -388,6 +388,18 @@ private fun KlippAppContent(
         val grades = HashMap(gs.grades)
         state.playing = false
         // run by the export service once it is in the foreground (refused: the dialog below, nothing made)
+        // (Klipp Lab: the frames it makes, for the export screen's frames per second)
+        val outFps = if (st.fps > 0) st.fps else snap.fps
+        val frames = ((snap.sequence?.duration ?: 0.0) * outFps).toLong()
+        se.gendut.klipp.engine.ExportJobs.frames = frames
+        se.gendut.klipp.engine.ExportJobs.summary = run {
+            val q = snap.sequence
+            val (ow, oh) = st.outputSize(q?.width ?: 0, q?.height ?: 0)
+            val codec = when (st.codec) { androidx.media3.common.MimeTypes.VIDEO_H265 -> "HEVC"; androidx.media3.common.MimeTypes.VIDEO_AV1 -> "AV1"; else -> "H.264" }
+            val ten = st.hlg || st.dolby || st.hdr || st.bitDepth == 10
+            val range = when { st.dolby -> "Dolby Vision"; st.hlg -> "HLG"; st.hdr -> "HDR"; else -> "SDR" }
+            listOfNotNull("${ow}×$oh".takeIf { ow > 0 }, "%.3f".format(outFps).trimEnd('0').trimEnd('.', ',') + " fps", "$codec${if (ten) " 10-bit" else ""}", range).joinToString(" · ")
+        }
         se.gendut.klipp.engine.ExportJobs.start(context, name) { ctx, onProgress ->
             se.gendut.klipp.engine.Exporter.export(ctx, snap, uris, name, look, master, grades, st, onProgress)
         }
@@ -1280,7 +1292,7 @@ private fun KlippAppContent(
         }
 
         // Klipp Lab: the MotionCam develops' progress, a strip that doesn't block: the clips already in can be edited
-        (mcrawProgress ?: se.gendut.klipp.engine.CrawImport.status)?.let { text ->
+        (mcrawProgress ?: se.gendut.klipp.engine.CrawImport.status ?: se.gendut.klipp.engine.LutStore.status)?.let { text ->
             Text(text, color = K.OnSurface, fontSize = 13.sp, maxLines = 2,
                 modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 64.dp, start = 16.dp, end = 16.dp)
                     .clip(RoundedCornerShape(12.dp)).background(K.SurfaceHigh.copy(alpha = 0.92f)).padding(horizontal = 14.dp, vertical = 8.dp)

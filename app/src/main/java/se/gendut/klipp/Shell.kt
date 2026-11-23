@@ -271,7 +271,10 @@ internal fun Transport(state: EditorState) {
                     autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp),
                 )
                 BasicText(
-                    stringResource(R.string.design_of_total, formatTc(state.projectEnd)), color = { K.OnSurfaceVar }, maxLines = 1,
+                    // Klipp Lab: and how many video clips the timeline has
+                    stringResource(R.string.design_of_total, formatTc(state.projectEnd)) +
+                        state.clips.count { it.kind == ClipKind.VIDEO }.let { n -> if (n > 0) " · $n clip${if (n == 1) "" else "s"}" else "" },
+                    color = { K.OnSurfaceVar }, maxLines = 1,
                     style = tabular.merge(TextStyle(fontSize = 11.sp)),
                     autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp, stepSize = 0.5.sp),
                 )

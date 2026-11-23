@@ -76,6 +76,13 @@ Import and timeline
 - Settings → Grading for beginners: the fundamental steps from log footage to a finished image – the clip's input,
   a correcting node, an optional look node, OpenDRT last, export – and a warning about stacking a conversion LUT with
   OpenDRT.
+- Export screen redone: the file's name and what is being made (size, frame rate, codec, SDR/HLG/Dolby Vision), a ring
+  that fills with the export with the percentage large in its middle, and the time spent, the time left (from the pace
+  so far) and the speed in frames per second.
+- Edit page: the number of video clips on the timeline, beside its length ("of 00:01:12:47 · 14 clips").
+- LUT import: much faster for large LUTs - the value lines are read without a regex (a 65³ LUT has 275,000 of them;
+  a pack of them took a minute or more). Its progress shows in the strip at the top ("Importing LUTs… 12"), and each
+  import's time goes to lut_import.txt in the app's folder.
 - Quick import: no proxy for the quick (half-size) develop. As the full develop finished, a proxy of the draft was
   started just before the draft was swapped out, and ran beside the full develop's first playback; the phone's codec
   crashed once there (in Android's codec, CodecLooper). The swap now comes first, then the proxies.

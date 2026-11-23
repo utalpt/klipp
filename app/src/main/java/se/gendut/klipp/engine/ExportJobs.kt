@@ -64,6 +64,15 @@ object ExportJobs {
     /** Asks for the foreground service; throws if Android refuses (tests put in their own). */
     internal var startService: (Context, Long, String) -> Unit = { c, id, name -> ExportService.start(c, id, name) }
 
+    /** Klipp Lab: the frames the running export makes (0 = unknown; set by the caller before [start]), for its frames-per-second in the export screen. */
+    @Volatile var frames = 0L
+
+    /** Klipp Lab: what the running export makes, one line for the export screen ("4096×2560 · 60 fps · HEVC 10-bit · SDR"). */
+    @Volatile var summary = ""
+
+    /** Klipp Lab: when the running export started (System.nanoTime, 0 = none) - kept here, so a screen that comes back shows the real time spent. */
+    @Volatile var startedNs = 0L
+
     /**
      * A new export named [name]: the foreground service is asked for and runs [work] once it is in the foreground.
      * False if one is already running or Android refused the service (then [status] is DENIED: nothing was made).
@@ -108,6 +117,7 @@ object ExportJobs {
         pending = null
         reason = null
         status = Status(id, p.name, Phase.RUNNING)
+        startedNs = System.nanoTime()
         val j = scope.launch {
             CrashReport.note("export job $id start: ${p.name}")
             ExportGuard.begin(c, p.name)

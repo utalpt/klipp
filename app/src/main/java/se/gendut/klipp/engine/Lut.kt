@@ -1,6 +1,8 @@
 package se.gendut.klipp.engine
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.opengl.GLES20
 import androidx.annotation.OptIn
 import androidx.media3.common.VideoFrameProcessingException
@@ -119,6 +121,49 @@ class CubeLut(val name: String, val size: Int, val data: FloatArray, val domainM
 
         private val WS = Regex("\\s+")
 
+        /** Klipp Lab: the numbers on a value line into [out] (up to 4; a '#' ends the line); how many, or -1 if one isn't a number. */
+        private fun floats(line: String, out: FloatArray): Int {
+            var n = 0
+            var i = 0
+            val len = line.length
+            while (i < len) {
+                val c = line[i]
+                if (c == '#') break
+                if (c == ' ' || c == '\t' || c == '\r') { i++; continue }
+                val start = i
+                while (i < len && line[i] != ' ' && line[i] != '\t' && line[i] != '\r' && line[i] != '#') i++
+                if (n >= out.size) return -1
+                out[n++] = number(line, start, i) ?: return -1
+            }
+            return n
+        }
+
+        /** A plain decimal (sign, digits, point, exponent) without making a string; null if it isn't one. */
+        private fun number(s: String, from: Int, to: Int): Float? {
+            var i = from
+            var neg = false
+            if (i < to && (s[i] == '-' || s[i] == '+')) { neg = s[i] == '-'; i++ }
+            var mant = 0L; var digits = 0; var scale = 0; var any = false
+            while (i < to && s[i].isDigit()) { if (digits < 18) { mant = mant * 10 + (s[i] - '0'); digits++ } else scale++; i++; any = true }
+            if (i < to && s[i] == '.') {
+                i++
+                while (i < to && s[i].isDigit()) { if (digits < 18) { mant = mant * 10 + (s[i] - '0'); digits++; scale-- }; i++; any = true }
+            }
+            if (!any) return null
+            if (i < to && (s[i] == 'e' || s[i] == 'E')) {
+                i++
+                var eneg = false
+                if (i < to && (s[i] == '-' || s[i] == '+')) { eneg = s[i] == '-'; i++ }
+                var e = 0; var ed = false
+                while (i < to && s[i].isDigit()) { e = e * 10 + (s[i] - '0'); i++; ed = true }
+                if (!ed) return null
+                scale += if (eneg) -e else e
+            }
+            if (i != to) return s.substring(from, to).toFloatOrNull()
+            val v = if (scale >= 0) mant * Math.pow(10.0, scale.toDouble()) else mant / Math.pow(10.0, -scale.toDouble())
+            return (if (neg) -v else v).toFloat()
+        }
+
         /** Parses a .cube file (3D). */
         fun parseCube(name: String, text: String): CubeLut {
             var size = 0
@@ -127,7 +172,18 @@ class CubeLut(val name: String, val size: Int, val data: FloatArray, val domainM
             // the values in a growing FloatArray (not a list of boxed Floats – a 65³ LUT has 824,000 values)
             var values = FloatArray(3 * 33 * 33 * 33)
             var count = 0
+            // Klipp Lab: the value lines (all but a few) are read without a regex or new strings – a 65³ LUT has 275,000
+            // of them, and splitting each with a regex made a pack of large LUTs take a minute to import
+            val tmp = FloatArray(4)
             for (raw in text.lineSequence()) {
+                val c0 = raw.firstOrNull { it != ' ' && it != '\t' } ?: continue
+                if (c0.isDigit() || c0 == '-' || c0 == '+' || c0 == '.') {
+                    val n = floats(raw, tmp)
+                    if (n != 3) continue
+                    if (count + 3 > values.size) values = values.copyOf(maxOf(values.size * 2, size * size * size * 3))
+                    values[count++] = tmp[0]; values[count++] = tmp[1]; values[count++] = tmp[2]
+                    continue
+                }
                 val line = raw.substringBefore('#').trim()
                 if (line.isEmpty()) continue
                 val parts = line.split(WS)
@@ -361,7 +417,25 @@ object LutStore {
      * after the zip). Returns the names imported, in order; a file that is not a valid 3D LUT is skipped and counted in
      * [ImportResult.failed].
      */
+    /** Klipp Lab: the import's progress for the strip at the top ("Importing LUTs… 12"), null when none runs. */
+    var status by androidx.compose.runtime.mutableStateOf<String?>(null)
+
     fun importAll(context: Context, uris: List<android.net.Uri>): ImportResult {
+        status = "Importing LUTs…"
+        val t0 = System.nanoTime()
+        var r: ImportResult? = null
+        try { return importAll0(context, uris).also { r = it } } finally {
+            status = null
+            // (how long it took, for comparing: Android/data/<app>/files/lut_import.txt)
+            runCatching {
+                java.io.File(context.getExternalFilesDir(null), "lut_import.txt").appendText(
+                    "${java.time.LocalDateTime.now().withNano(0)}  ${uris.size} file(s) → ${r?.names?.size ?: 0} LUTs, ${r?.failed ?: 0} failed, " +
+                        "${(System.nanoTime() - t0) / 1_000_000} ms\n")
+            }
+        }
+    }
+
+    private fun importAll0(context: Context, uris: List<android.net.Uri>): ImportResult {
         init(context)
         val d = dir ?: return ImportResult(emptyList(), uris.size)
         val done = ArrayList<String>()
@@ -392,6 +466,7 @@ object LutStore {
                             forget(key)
                             cache[key] = lut
                             done += key
+                            status = "Importing LUTs… ${done.size}"
                         }
                     }
                 }.onFailure { failed++ }
