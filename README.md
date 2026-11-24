@@ -18,7 +18,6 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 | **MotionCam RAW** (.mcraw) | Developed on the GPU into a log video (S-Log3, LogC4, F-Log2, DaVinci Intermediate…). Clips go on the timeline at once and switch to their develop when ready. Needs a 10-bit HEVC encoder. |
 | **Live EI** | The EI shows at once, as on a cinema camera; Develop bakes it in from the RAW. A pasted grade carries the EI to every RAW clip. |
 | **Cinematic RAW** (.CRAW) | By [matthew777777](https://github.com/matthew777777), with his app's decoder. Same develop as MotionCam RAW. Android 12+. |
-| **DNG folders** *(early)* | PhotonCamera raw video and CinemaDNG, with sound. Uncompressed DNGs only for now. |
 
 ### 🎨 Color and HDR
 
@@ -43,7 +42,15 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 - ❓ **Long-press help** on sliders, fields and buttons · 🎓 **Grading for beginners** guide
 - 🖥️ **Full screen**, three interface sizes, resizable picture in landscape
 
-<details>
+<details open>
+<summary><b>🧪 Experimental</b></summary>
+
+- **DNG folders:** a folder of DNG frames (CinemaDNG, PhotonCamera's raw video) imports as a clip, with its sound.
+  Uncompressed DNGs only. PhotonCamera's DNG recording drops many frames, so those clips stutter – use its .mcraw.
+
+</details>
+
+<details open>
 <summary><b>🔁 Sent to Klipp and merged</b> (Klipp 0.21.0-beta.2, PRs #4–#10)</summary>
 
 - HLG export from the grade (#6)
@@ -56,7 +63,7 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 
 </details>
 
-<details>
+<details open>
 <summary><b>🙏 Credits</b></summary>
 
 [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the [FilmCraft](https://github.com/storytold/filmcraft)
