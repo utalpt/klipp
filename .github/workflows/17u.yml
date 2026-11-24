@@ -12,6 +12,8 @@ name: Klipp Lab
 on:
   push:
     branches: [xiaomi-17u, hlg, 'test/**']
+    # a push that only changes text (README, changelog) builds nothing - and so cancels no build still running
+    paths-ignore: ['**.md', 'docs/**']
     tags: ['v*-17u.*']
   workflow_dispatch:
     inputs:

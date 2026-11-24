@@ -1,93 +1,77 @@
-# 🎬 Klipp
+# 🎬 Klipp Lab
 
-> 🧪 **This is Klipp Lab**, a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only)
-> on the `xiaomi-17u` branch. Its focus is log video and Dolby Vision from George's Stock camera mods, while
-> staying a general video editor. It runs on any Android 10+ phone (64-bit); built and tested
-> on a Xiaomi 17 Ultra. HLG export needs a 10-bit HDR HEVC encoder; the Dolby Vision options only show on phones
-> with a Dolby Vision encoder (the 17 Ultra has one; the 15 and 14 Ultra not checked yet). It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Fixes that suit everyone are offered to
-> Klipp as pull requests (seven are in Klipp 0.21.0-beta.2: #4–#10, marked below as "In Klipp too"); issues with the
-> fork's own features go here, not to Klipp.
+> 🧪 **Klipp Lab** is a fork of [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren (GPL-3.0-only), on the
+> `xiaomi-17u` branch. It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Built and tested on a Xiaomi
+> 17 Ultra; runs on any 64-bit Android 10+ phone. Issues with the fork's own features go here, not to Klipp.
+
+**⬇️ [Download the latest test build](https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk)**
+(installs over the previous one) · 📝 [Changelog](CHANGELOG-17U.md)
 
 ## 🧪 What Klipp Lab adds
 
-- 🌈 **HLG export from the grade:** each clip's last OpenDRT node renders Rec.2100 HLG, 10-bit HEVC, tagged
-  BT.2020 / HLG (Google Photos shows it as HDR). Ungraded clips, titles and captions are converted from SDR
-  (BT.2408, SDR white at 75 % HLG), and the export dialog shows what will actually be made. *(In Klipp too since
-  0.21.0-beta.2: PR #6.)*
-- 🎥 **Dolby Vision export from the grade:** the same HLG encoded by the phone's Dolby Vision encoder as Profile 8.4
-  (HLG compatible), the dynamic metadata made from the edited frames.
-- 🔁 **Dolby Vision in, Dolby Vision out:** Dolby Vision clips cut and edited come out as Dolby Vision 8.4 again
-  (Export → Dolby Vision · keep HDR).
-- 📈 **Bitrates above the encoder's listed limit:** the phone lists 160 Mbps for Dolby Vision; Klipp Lab passes the
-  chosen bitrate on, up to 300 Mbps. Use CBR for Dolby Vision – in VBR the encoder keeps the bitrate low.
-- 🎚️ **EI per clip:** the EI a log clip was shot at and the EI it is rated at, applied before all nodes, LUTs and
-  OpenDRT; for the 17 Ultra mods also where the sensor clips (the 0.0072 × EI relation from George Kiarie's
-  RawViewer).
-- 🌡️ **White balance per clip:** Temperature and Tint in the clip's input (the EI chip on the Color page), in the
-  linear light before all nodes, as in a raw developer – live while dragging.
-- 📸 **MotionCam RAW (.mcraw) in:** the video picker's MotionCam RAW chip lists the .mcraw files of MotionCam's folder; importing
-  develops each one (Quick import: half size first, the full develop in the background) into a log video (S-Log3, F-Log2, LogC4, DaVinci Intermediate…) at an EI of your choice or Auto,
-  with the camera's white balance. The RAW settings stay changeable afterwards, as in a raw developer: on the Color page
-  pick another EI or log and Develop again (the clip is swapped in place, with a new proxy), and the clip's
-  Temperature/Tint can be baked into the develop. Exporting HLG adds OpenDRT to MotionCam clips that lack it. The clips
-  go on the timeline at once, each as a placeholder (a still, its real length) until its develop takes its place - edit
-  or import more from the first second; a project started from them gets the full develop's size. **EI is live:** the
-  RAW settings' EI shows at once (a rating on the develop, as a cinema camera's EI on S-Log3) and Develop bakes it in;
-  a pasted grade (Paste, All video clips in) brings its EI to every RAW clip at once while each is developed again from
-  the RAW behind, and Render waits for those develops, then renders. *(Early: feedback welcome.)*
-- 🗂️ **DNG folders in** (early): a folder of DNG frames - PhotonCamera's raw video, CinemaDNG - listed in the MotionCam RAW chip
-  and developed on the GPU like MotionCam RAW, with its sound (FLAC/WAV beside the frames). The app's own DNG reader:
-  uncompressed CFA DNGs for now (no lossless JPEG or Linear/ProRAW yet).
-- 🎞️ **Cinematic RAW Studio (.CRAW) in** – by [matthew777777](https://github.com/matthew777777): .CRAW clips – from the video
-  picker's Cinematic RAW chip (the folder the app records into, picked once) or Import → Files app – are developed into an editable log copy (with AAC sound), at the log and EI chosen in the dialog
-  that opens, on the GPU (the same develop as MotionCam RAW, with Quick import and RAW settings; RGB-cell takes on the CPU); RAW settings, or **CRAW development** for a CPU develop, develop a clip again in place. Read with the app's own
-  Apache-2.0 decoder (`third_party/craw`). Needs Android 12+ and a 10-bit HEVC encoder.
-- 🐢 **Slow-mo:** a high frame rate clip at the project's rate, every source frame used once (120 → 24, 120 → 30).
-- 🗂️ **LUT browser:** previews and groups, .zip and multi import, multi-select delete *(in Klipp too since
-  0.21.0-beta.2: PR #5)*; Klipp Lab only: much faster import (a .zip of 33 LUTs in about 4 s, with progress).
-- 📤 **Export screen:** a progress ring with the file name, what is being made (size, rate, codec, SDR/HLG/HDR) and
-  elapsed / time left / speed; the edit page shows how many clips are on the timeline.
-- 🖼️ **Video picker** with previews (log clips included); clips keep their file names *(in Klipp too since
-  0.21.0-beta.2: PR #7)*. Klipp Lab only: it opens in DCIM/Camera, and Select all picks every video shown (a folder or
-  the MotionCam RAW list), oldest first.
-- 🔓 **Video picker with limited access** (Android 14+, "select some"): "Choose videos" adds more, and Allow access asks
-  the system again before sending you to the settings. *(In Klipp too since 0.21.0-beta.2.)*
-- ➕ **Add to the timeline** in the order selected, or straight on import. *(In Klipp too since 0.21.0-beta.2: PR #8.)*
-- ⏱️ **Frame rates:** phone clips give a standard project rate (a 60 fps clip measured at 58.6 makes a 60 fps
-  project), and the rate chosen for a new project is kept.
-- 🎨 Files without a colour transfer keep their matrix and range. *(In Klipp too since 0.21.0-beta.2: PR #4.)*
-- ✅ Select several projects and delete them at once. *(In Klipp too since 0.21.0-beta.2: PR #9.)*
-- 🔲 The selection box scrolls the timeline at the edges. *(In Klipp too since 0.21.0-beta.2: PR #10.)*
-- 🧲 **Close gaps:** hold a track's header → Close gaps, or Close gap beside Delete for a selected clip – the clip
-  moves back to the one before it, linked clips follow.
-- 💾 **Storage page** (Settings → Storage): what the app keeps on the phone in one place – MotionCam develops,
-  proxies, node cache and renders, each with its Clear, plus Clear caches (proxies, node cache and renders at once;
-  the MotionCam develops stay) – and "Warn when Klipp Lab uses more than" 5 / 10 / 20 / 50 GB (or off); opening a
-  project then says what each kind takes.
-- 🎓 **Grading for beginners** (Settings): the fundamental steps from log or MotionCam RAW footage to a finished image.
-- ❓ **Long-press help:** hold a slider's name, a drop-down field, a Color page button or a timeline action to see what
-  it does (controls that already had a long-press keep it).
-- 🖥️ **Interface:** full screen (status and navigation bars hidden, the top bar just under the camera hole); interface
-  size Normal, Compact (default) or Small (Settings → Appearance); Edit, Color and Audio always show their names; in
-  landscape, drag the grip between the picture and the timeline (double tap to reset).
+Its focus: **log video, RAW video and HDR** from phone cameras, graded and exported on the phone.
 
-Everything the fork changes, entry by entry: [CHANGELOG-17U.md](CHANGELOG-17U.md).
+### 📸 RAW video in
 
-**⬇️ Test build** (the latest CI build of `xiaomi-17u`, installs over the previous one):
-https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk
+| | |
+|---|---|
+| **MotionCam RAW** (.mcraw) | Developed on the GPU into a log video (S-Log3, LogC4, F-Log2, DaVinci Intermediate…). Clips go on the timeline at once and switch to their develop when ready. Needs a 10-bit HEVC encoder. |
+| **Live EI** | The EI shows at once, as on a cinema camera; Develop bakes it in from the RAW. A pasted grade carries the EI to every RAW clip. |
+| **Cinematic RAW** (.CRAW) | By [matthew777777](https://github.com/matthew777777), with his app's decoder. Same develop as MotionCam RAW. Android 12+. |
+| **DNG folders** *(early)* | PhotonCamera raw video and CinemaDNG, with sound. Uncompressed DNGs only for now. |
 
-🙏 Credits: [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the
-[FilmCraft](https://github.com/storytold/filmcraft) engine. Film simulation from
-[spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato et al. [OpenDRT](https://github.com/jedypod/open-display-transform) by Jed Smith. EI relation
-and slow-mo idea from George Kiarie's RawViewer. Cinematic RAW Studio .CRAW import by matthew777777, with his app's decoder (Apache-2.0).
-MotionCam RAW read with MotionCam's own decoder library,
-[motioncam-decoder](https://github.com/mirsadm/motioncam-decoder) (Apache-2.0, with the MIT-licensed JSON for Modern
-C++ by Niels Lohmann and SIMDe). Dolby Vision approach from Dolby's
-[dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor) sample (BSD-3-Clause-Clear).
-HLG with deleted clips: the same fix as Klipp's 2797f03 by Flabbjaxaren.
+### 🎨 Color and HDR
 
-📐 Methods (our own code, after published work): Malvar, He and Cutler's demosaic (2004) for MotionCam RAW; Kim et
-al.'s Planckian locus fit (2002) for the white balance; ITU-R BT.2100 (HLG) and BT.2408 (SDR in HLG).
+| | |
+|---|---|
+| **HLG export** | From each clip's OpenDRT node: Rec.2100 HLG, 10-bit HEVC, shown as HDR by Google Photos. Needs a 10-bit HDR HEVC encoder. |
+| **Dolby Vision export** | The same grade as Dolby Vision 8.4, with metadata from the edited frames. Dolby Vision clips in come out as Dolby Vision again. Only on phones with a Dolby Vision encoder (the 17 Ultra has one). |
+| **EI and white balance per clip** | Applied before all nodes, as in a raw developer; for George Kiarie's 17 Ultra camera mods also where the sensor clips. |
+| **LUT browser** | Previews of the current frame, groups, fast .zip import. |
+
+### ✂️ Editing and export
+
+- 🐢 **Slow-mo** at the project's rate (120 → 24 / 30), every source frame used once
+- 🧲 **Close gaps** on a track or after a clip
+- ⏱️ **Standard frame rates** for phone clips (58.6 → 60)
+- 📈 **Bitrates above the encoder's limit** (up to 300 Mbps)
+- 📤 **Export screen** with progress, time left and speed · clip count on the edit page
+
+### 📱 App
+
+- 💾 **Storage page:** what the app keeps on the phone, with a Clear for each kind
+- ❓ **Long-press help** on sliders, fields and buttons · 🎓 **Grading for beginners** guide
+- 🖥️ **Full screen**, three interface sizes, resizable picture in landscape
+
+<details>
+<summary><b>🔁 Sent to Klipp and merged</b> (Klipp 0.21.0-beta.2, PRs #4–#10)</summary>
+
+- HLG export from the grade (#6)
+- LUT browser with previews and groups (#5)
+- Video picker with previews; clips keep their names (#7); limited access on Android 14+
+- Add to the timeline in the order selected, or on import (#8)
+- Files without a colour transfer keep their matrix and range (#4)
+- Select several projects and delete them (#9)
+- The selection box scrolls the timeline at the edges (#10)
+
+</details>
+
+<details>
+<summary><b>🙏 Credits</b></summary>
+
+[Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the [FilmCraft](https://github.com/storytold/filmcraft)
+engine. Film simulation from [spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato et al.
+[OpenDRT](https://github.com/jedypod/open-display-transform) by Jed Smith. EI relation and slow-mo idea from George
+Kiarie's RawViewer. Cinematic RAW Studio .CRAW import by matthew777777, with his app's decoder (Apache-2.0). MotionCam
+RAW read with [motioncam-decoder](https://github.com/mirsadm/motioncam-decoder) (Apache-2.0, with the MIT-licensed JSON
+for Modern C++ by Niels Lohmann and SIMDe). Dolby Vision approach from Dolby's
+[dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor) sample (BSD-3-Clause-Clear). HLG with
+deleted clips: the same fix as Klipp's 2797f03 by Flabbjaxaren.
+
+Methods (our own code, after published work): Malvar, He and Cutler's demosaic (2004); Kim et al.'s Planckian locus
+fit (2002); ITU-R BT.2100 (HLG) and BT.2408 (SDR in HLG).
+
+</details>
 
 ---
 
