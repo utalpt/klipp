@@ -140,6 +140,12 @@ object McrawConvert {
             val t0ns = frames.getLong(0)
             val fps = if (n > 1) (n - 1) / ((frames.getLong(n - 1) - t0ns) / 1e9) else 30.0
             line("convert: $name  ${w}x$hh  $n frames  ${"%.3f".format(fps)} fps")
+            // Klipp Lab: the phone's orientation while shooting - the file is tagged to be turned (the pixels stay as the
+            // sensor gives them), see Mcraw.rotationOf
+            // (or the turn chosen in the picker's Rotation when the clip was imported)
+            val rotSet = se.gendut.klipp.McrawFolder17u.rotFor(ctx, src)
+            val rotation = rotSet ?: Mcraw.rotationOf(c, ff)
+            if (rotation != 0 || rotSet != null) line("rotation: $rotation°" + if (rotSet != null) " (set at import)" else " (orientation ${ff.optInt("orientation")}, sensor ${c.optInt("sensorOrientation", 90)})")
             info.optJSONObject("dng")?.let { d -> line("DNG folder: ${d.optInt("missing")} of $n frames missing in the recording (repeated), ${d.optInt("bits")}-bit, ${d.optDouble("frameRate")} fps tag") }
 
             // MotionCam pads the frame's buffer below the picture (4096×3072 holding a 4096×2560 picture): those rows,
@@ -263,14 +269,30 @@ object McrawConvert {
                 val inputSurface = codec.createInputSurface()
                 codec.start()
                 val muxer = MediaMuxer(outPfd.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                if (rotation != 0) muxer.setOrientationHint(rotation)
                 var track = -1
                 var audioTrack = -1
                 val info2 = MediaCodec.BufferInfo()
+                // Klipp Lab: the end-of-stream wait as in Klipp 0.22 (Flabbjaxaren, McrawConvert, commits accf1e2,
+                // d4f4f7c, 43048cd): every frame back from the encoder is enough – the phone's HEVC encoder now and then
+                // gives no end of stream after a 4K develop; one that stops with frames still in it fails the develop
+                // (tried again) instead of hanging the import for good
+                var outFrames = 0
                 fun drain(end: Boolean) {
+                    var quiet = 0
                     while (true) {
                         val i = codec.dequeueOutputBuffer(info2, if (end) 10_000 else 0)
+                        if (i >= 0 || i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) quiet = 0
                         when {
-                            i == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!end) return
+                            i == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                                if (!end) return
+                                quiet++
+                                if (outFrames >= encoded && quiet > 20) {
+                                    line("end of stream: all $outFrames frames out, no end flag from the encoder")
+                                    return
+                                }
+                                if (quiet >= 500) error("the encoder stopped after $outFrames of $encoded frames")
+                            }
                             i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                                 track = muxer.addTrack(codec.outputFormat)
                                 audioTrack = runCatching { soundFormat.get(10, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull()?.let { muxer.addTrack(it) } ?: -1
@@ -279,7 +301,7 @@ object McrawConvert {
                             i >= 0 -> {
                                 val ob = codec.getOutputBuffer(i)!!
                                 if (info2.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) info2.size = 0
-                                if (info2.size > 0 && track >= 0) { ob.position(info2.offset); ob.limit(info2.offset + info2.size); muxer.writeSampleData(track, ob, info2) }
+                                if (info2.size > 0 && track >= 0) { ob.position(info2.offset); ob.limit(info2.offset + info2.size); muxer.writeSampleData(track, ob, info2); outFrames++ }
                                 codec.releaseOutputBuffer(i, false)
                                 if (info2.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
                             }
@@ -287,6 +309,11 @@ object McrawConvert {
                     }
                 }
 
+                // Klipp Lab: frame times always move on (Klipp 0.22, Flabbjaxaren, accf1e2) – the encoder drops a frame
+                // whose time doesn't (a file's clock stepping back or repeating)
+                var lastPts = Long.MIN_VALUE
+                var stepped = 0
+                val frameNs = (1e9 / fps).toLong().coerceAtLeast(1L)
                 val gl = Gl(inputSurface, w, hh, ch, ow, oh)
                 try {
                     gl.setup(cfa, c, camToOut, headroom(ei), draft, outIn.oetf)
@@ -299,7 +326,10 @@ object McrawConvert {
                         gl.drawFrame(f.buf, f.meta, c)
                         free.put(f.buf)
                         t2 = System.nanoTime(); tDraw += t2 - t; t = t2
-                        gl.present((frames.getLong(f.index) - t0ns))
+                        var pts = frames.getLong(f.index) - t0ns
+                        if (lastPts != Long.MIN_VALUE && pts <= lastPts) { pts = lastPts + frameNs; stepped++ }
+                        lastPts = pts
+                        gl.present(pts)
                         t2 = System.nanoTime(); tSwap += t2 - t; t = t2
                         encoded++
                         drain(false)
@@ -307,6 +337,7 @@ object McrawConvert {
                         if (k % 4 == 0) progress(k / n.toFloat())
                     }
                 } finally { uploadNs = gl.tUpload; gl.release() }
+                if (stepped > 0) line("frame times: $stepped did not move on – each put one frame after the one before")
                 val tEnd = System.nanoTime()
                 codec.signalEndOfInputStream()
                 drain(true)
@@ -442,6 +473,11 @@ object McrawConvert {
             val vc = ci.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).videoCapabilities ?: continue
             var tw = w
             while (tw >= 1280) {
+                // Klipp Lab: the exact size first, even sides (Klipp 0.22, Flabbjaxaren, e34a6ca) – rounded down to 16
+                // lines, a half-size 3840×2160 develop was 1920×1072 and a project made from it 3840×2144
+                val tw2 = tw / 2 * 2
+                val th2 = ((tw.toLong() * h / w).toInt()) / 2 * 2
+                if (vc.isSizeSupported(tw2, th2)) return Triple(tw2, th2, ci.name)
                 val th = ((tw.toLong() * h / w) / 16 * 16).toInt()
                 val tw16 = tw / 16 * 16
                 if (vc.isSizeSupported(tw16, th) && (vc.areSizeAndRateSupported(tw16, th, fps) || vc.isSizeSupported(tw16, th))) return Triple(tw16, th, ci.name)

@@ -785,8 +785,10 @@ object Spektra {
     // ------------------------------------------------------------------------------------------- LUT in the node
 
     private const val SIZE = 33
-    private val cache = object : LinkedHashMap<String, CubeLut>(6, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CubeLut>?) = size > 6
+    // Klipp Lab: 32 (was 6) – the film browser bakes every film and paper for its cards, and a card picked or held
+    // should not bake again (a 33³ table is about 430 KB: 32 are about 14 MB)
+    private val cache = object : LinkedHashMap<String, CubeLut>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CubeLut>?) = size > 32
     }
 
     fun clearCache() = synchronized(cache) { cache.clear() }

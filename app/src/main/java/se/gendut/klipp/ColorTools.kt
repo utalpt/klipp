@@ -85,7 +85,7 @@ import kotlin.math.roundToInt
 
 /** LUT in the selected node (this clip only). The LUT is applied after the node's other adjustments. */
 @Composable
-fun NodeLutEditor(n: GradeNode, onLive: (GradeNode) -> Unit, onCommit: (GradeNode) -> Unit, onImport: (((String) -> Unit) -> Unit)?, preview: LutPreview? = null) {
+fun NodeLutEditor(n: GradeNode, onLive: (GradeNode) -> Unit, onCommit: (GradeNode) -> Unit, onImport: (((String) -> Unit) -> Unit)?, preview: LutPreview? = null, filmBefore: Boolean = false) {
     // the LUT is read (and OpenDRT baked, 33³ points) on a background thread before the node is committed – never on the main thread
     val bake = rememberCoroutineScope()
     val pending = androidx.compose.runtime.remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
@@ -118,7 +118,7 @@ fun NodeLutEditor(n: GradeNode, onLive: (GradeNode) -> Unit, onCommit: (GradeNod
                 // with OpenDRT the LUT is baked together with the transform – it is rebuilt when the finger lifts
                 onLive = { if (n.drt == null) onLive(n.copy(lutMix = it)) }) { onCommit(n.copy(lutMix = it)) }
         }
-        DrtEditor(n, onCommit)
+        DrtEditor(n, onCommit, filmBefore)
     }
 }
 
@@ -127,9 +127,14 @@ fun NodeLutEditor(n: GradeNode, onLive: (GradeNode) -> Unit, onCommit: (GradeNod
  * color rendering. Applied after the node's adjustments and LUT – put it in the last node for an "output transform".
  */
 @Composable
-private fun DrtEditor(n: GradeNode, onCommit: (GradeNode) -> Unit) {
+private fun DrtEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, filmBefore: Boolean = false) {
     val d = n.drt
     SectionTitle(stringResource(R.string.colortools_drt_title))
+    // Klipp Lab: an earlier node has a film - this OpenDRT is left out (see ClipGrade.afterFilm)
+    if (filmBefore && d != null) Text(
+        stringResource(R.string.colortools_drt_after_film),
+        color = K.Error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+    )
     Text(
         stringResource(R.string.colortools_drt_intro),
         color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
@@ -174,7 +179,11 @@ private object FilmBake {
 }
 
 @Composable
-fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode) -> Unit)? = null) {
+fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode) -> Unit)? = null, preview: FilmPreview? = null, detail: FilmPreview? = null,
+               /** A held card: the node with that film (null on release) – the color page's still shows it (see [GradeState.liveNode]). */
+               onHold: ((GradeNode?) -> Unit)? = null,
+               /** Klipp Lab: the clip's own log curve (its EI chip's input), the film's input when it is turned on. */
+               clipInput: String? = null) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     se.gendut.klipp.engine.Spektra.init(ctx)
     // baking (36,000 points through the whole chain) on a background thread; only the latest is committed. Not tied
@@ -183,6 +192,11 @@ fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode)
     val bake = FilmBake.scope
     val pending = FilmBake.pending
     var baking by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    // Klipp Lab: a held card – its film is made ready (setup and baked LUT) off the GL thread first, then shown; the
+    // player making it itself while drawing took longer than the hold, and the release put the grade back before
+    val holdScope = androidx.compose.runtime.rememberCoroutineScope()
+    val holdJob = androidx.compose.runtime.remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    var warming by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     fun commit(nn: GradeNode) {
         // the player shows the change while the finger is still on the slider (the commit waits for it to settle)
         onLive?.invoke(nn)
@@ -203,8 +217,11 @@ fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode)
         Row(Modifier.padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             // off keeps the film's settings in the node; on brings them back (it began from the default film again)
             ToggleChip(stringResource(R.string.colortools_off), f == null, { if (f != null) commit(n.copy(film = null, filmOff = f)) }, Modifier.testTag("film:off"))
-            ToggleChip(stringResource(R.string.colortools_on), f != null, { if (f == null) commit(n.copy(film = n.filmOff ?: se.gendut.klipp.engine.Film(), filmOff = null)) }, Modifier.testTag("film:on"))
-            if (baking) Text(stringResource(R.string.colortools_computing), color = K.Outline, fontSize = 12.sp, modifier = Modifier.testTag("film:baking"))
+            ToggleChip(stringResource(R.string.colortools_on), f != null, { if (f == null) commit(n.copy(film = n.filmOff?.let { o ->
+                // Klipp Lab: a film kept off in Rec.709 on a log clip comes back on the clip's log
+                if (clipInput != null && o.input == se.gendut.klipp.engine.OpenDrt.Input.REC709.key) o.copy(input = clipInput) else o
+            } ?: se.gendut.klipp.engine.Film(input = clipInput ?: se.gendut.klipp.engine.OpenDrt.Input.REC709.key), filmOff = null)) }, Modifier.testTag("film:on"))
+            if (baking || warming) Text(stringResource(R.string.colortools_computing), color = K.Outline, fontSize = 12.sp, modifier = Modifier.testTag("film:baking"))
         }
         if (f != null) {
             val idx = se.gendut.klipp.engine.Spektra.index
@@ -227,11 +244,29 @@ fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode)
             if (f.effectsOnly) hint(stringResource(R.string.colortools_film_mode_effects_hint))
             // ---- the basics, always shown: what is simulated, what comes in, what goes out
             val fx = f.effectsOnly
-            se.gendut.klipp.DropField(stringResource(if (fx) R.string.colortools_film_effects_from else R.string.colortools_film), idx.films.map { se.gendut.klipp.Opt(it.id, it.name, kind(it), key = it.id) }, f.film, "film:stock") { id ->
-                val info = idx.films.first { it.id == id }
+            // Klipp Lab: the films as cards with the current frame through each (as the LUT browser), grouped negative /
+            // slide / cine; hold one to see it on the big picture
+            fun withFilm(info: se.gendut.klipp.engine.Spektra.StockInfo) =
                 // changing film: the film's own paper (slide film: no printing)
-                set(f.copy(film = id, print = if (info.type == "positive") null else (info.targetPrint ?: f.print ?: "kodak_portra_endura")))
+                f.copy(film = info.id, print = if (info.type == "positive") null else (info.targetPrint ?: f.print ?: "kodak_portra_endura"))
+            fun hold(nf: se.gendut.klipp.engine.Film?) {
+                holdJob[0]?.cancel()
+                if (nf == null) { warming = false; if (onHold != null) onHold(null) else onLive?.invoke(n); return }
+                warming = true
+                holdJob[0] = holdScope.launch {
+                    val t0 = System.nanoTime()
+                    withContext(Dispatchers.Default) {
+                        runCatching { se.gendut.klipp.engine.FilmFx.setup(nf); se.gendut.klipp.engine.Spektra.composite(null, 0f, nf) }
+                    }
+                    warming = false
+                    runCatching { java.io.File(ctx.getExternalFilesDir(null), "film_previews.txt").appendText("${java.time.LocalTime.now().withNano(0)} hold ${nf.film}/${nf.print}/${nf.diffusion}: ready in ${(System.nanoTime() - t0) / 1_000_000} ms\n") }
+                    if (onHold != null) onHold(n.copy(film = nf)) else live(nf)
+                }
             }
+            SubLabel(stringResource(if (fx) R.string.colortools_film_effects_from else R.string.colortools_film))
+            val groups = idx.films.groupBy { kind(it) }
+            val filmCards = groups.flatMap { (g, l) -> l.mapIndexed { i, s -> FilmCardItem(s.id, s.name, null, withFilm(s), if (i == 0) g else null) } }
+            FilmBrowser17u(filmCards, f.film, preview, { c -> set(c.film) }, ::hold, "film:stock")
             val positive = idx.films.firstOrNull { it.id == f.film }?.type == "positive"
             if (fx) {
                 // effects only: no paper, exposure or display – the stock only decides the grain and the halation
@@ -243,11 +278,16 @@ fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode)
                 val cinePrint = stringResource(R.string.colortools_print_cine)
                 val photoPaper = stringResource(R.string.colortools_print_photo_paper)
                 val filmsOwn = stringResource(R.string.colortools_print_films_own)
-                se.gendut.klipp.DropField(stringResource(R.string.colortools_print_paper), se.gendut.klipp.engine.Spektra.printsFor(f.film).map {
-                    se.gendut.klipp.Opt(it.id, it.name, listOfNotNull(if (it.support == "film") cinePrint else photoPaper, if (it.id == target) filmsOwn else null).joinToString(" · "), key = it.id)
-                }, f.print ?: target ?: "kodak_portra_endura", "film:print") { set(f.copy(print = it)) }
+                // Klipp Lab: the papers as cards too, each over the film chosen
+                SubLabel(stringResource(R.string.colortools_print_paper))
+                val paperCards = se.gendut.klipp.engine.Spektra.printsFor(f.film).map {
+                    FilmCardItem(it.id, it.name, listOfNotNull(if (it.support == "film") cinePrint else photoPaper, if (it.id == target) filmsOwn else null).joinToString(" · "), f.copy(print = it.id), null)
+                }
+                FilmBrowser17u(paperCards, f.print ?: target ?: "kodak_portra_endura", preview, { c -> set(c.film) }, ::hold, "film:print")
             }
             se.gendut.klipp.DropField(stringResource(R.string.colortools_input_colorspace), se.gendut.klipp.engine.OpenDrt.Input.entries.map { se.gendut.klipp.Opt(it.key, it.label, key = it.key) }, f.input, "film:input") { set(f.copy(input = it)) }
+            // Klipp Lab: the film reads the picture as this – a log clip read as Rec.709 comes out flat and pale
+            if (clipInput != null && clipInput != f.input) hint(stringResource(R.string.colortools_film_input_differs, se.gendut.klipp.engine.OpenDrt.Input.of(clipInput).label))
             if (!fx) PropSlider(stringResource(R.string.colortools_exposure), f.ev, -3f, 3f, 0f, { "%+.1f EV".format(it) }, "filmEv", lane = false, onLive = { live(f.copy(ev = (it * 10).roundToInt() / 10f)) }) { set(f.copy(ev = (it * 10).roundToInt() / 10f)) }
             // (effects only: the image keeps its encoding – no display to choose)
             if (!f.effectsOnly) {
@@ -258,16 +298,27 @@ fun FilmEditor(n: GradeNode, onCommit: (GradeNode) -> Unit, onLive: ((GradeNode)
             // ---- the rest in the order of the chain, folded: camera → negative → print → scan
             FilmSection("camera", stringResource(R.string.colortools_camera),
                 changed = f.format != d.format || f.lensBlur != d.lensBlur || f.diffusion != d.diffusion || f.diffusionStrength != d.diffusionStrength) {
-                se.gendut.klipp.DropField(stringResource(R.string.colortools_film_format), FILM_FORMATS.map { (mm, name) -> se.gendut.klipp.Opt(mm, name, stringResource(R.string.colortools_film_format_width, if (mm % 1f == 0f) "%.0f".format(mm) else "%.1f".format(mm)), key = "f$mm") },
-                    FILM_FORMATS.minByOrNull { kotlin.math.abs(it.first - f.format) }!!.first, "film:format") { set(f.copy(format = it)) }
+                // Klipp Lab: the formats as cards too – the brightest part of the frame, where the halation's width shows
+                SubLabel(stringResource(R.string.colortools_film_format))
+                val nearestFormat = FILM_FORMATS.minByOrNull { kotlin.math.abs(it.first - f.format) }!!.first
+                val formatCards = FILM_FORMATS.map { (mm, name) ->
+                    FilmCardItem("f$mm", name, stringResource(R.string.colortools_film_format_width, if (mm % 1f == 0f) "%.0f".format(mm) else "%.1f".format(mm)), f.copy(format = mm), null)
+                }
+                FilmBrowser17u(formatCards, "f$nearestFormat", detail ?: preview, { c -> set(c.film) }, ::hold, "film:format")
                 hint(stringResource(R.string.colortools_film_format_hint))
                 PropSlider(stringResource(R.string.colortools_lens_blur), f.lensBlur, 0f, 60f, 0f, { "%.0f µm".format(it) }, "filmLens", lane = false, onLive = { live(f.copy(lensBlur = it.roundToInt().toFloat())) }) { set(f.copy(lensBlur = it.roundToInt().toFloat())) }
-                se.gendut.klipp.DropField(stringResource(R.string.colortools_diffusion_camera),
-                    listOf(se.gendut.klipp.Opt<String?>(null, stringResource(R.string.colortools_none_filter), key = "none")) + se.gendut.klipp.engine.FilmFx.FAMILIES.map { se.gendut.klipp.Opt<String?>(it.key, it.label, it.hint, key = it.key) },
-                    f.diffusion, "film:diffusion") { set(f.copy(diffusion = it)) }
+                // Klipp Lab: the filters as cards too – the brightest part of the frame, where they show
+                SubLabel(stringResource(R.string.colortools_diffusion_camera))
+                val noneFilter = stringResource(R.string.colortools_none_filter)
+                val diffCards = listOf(FilmCardItem("none", noneFilter, null, f.copy(diffusion = null), null)) +
+                    se.gendut.klipp.engine.FilmFx.FAMILIES.map { FilmCardItem(it.key, it.label, null, f.copy(diffusion = it.key), null) }
+                FilmBrowser17u(diffCards, f.diffusion ?: "none", detail ?: preview, { c -> set(c.film) }, ::hold, "film:diffusion")
                 if (f.diffusion != null) {
-                    se.gendut.klipp.DropField(stringResource(R.string.colortools_filter_strength), se.gendut.klipp.engine.FilmFx.STRENGTHS.map { v -> se.gendut.klipp.Opt(v, strengthLabel(v), key = "s$v") },
-                        se.gendut.klipp.engine.FilmFx.STRENGTHS.minByOrNull { kotlin.math.abs(it - f.diffusionStrength) }!!, "film:diffStrength") { set(f.copy(diffusionStrength = it)) }
+                    SubLabel(stringResource(R.string.colortools_filter_strength))
+                    val strengths = se.gendut.klipp.engine.FilmFx.STRENGTHS
+                    val nearest = strengths.minByOrNull { kotlin.math.abs(it - f.diffusionStrength) }!!
+                    val strengthCards = strengths.map { v -> FilmCardItem("s$v", strengthLabel(v), null, f.copy(diffusionStrength = v), null) }
+                    FilmBrowser17u(strengthCards, "s$nearest", detail ?: preview, { c -> set(c.film) }, ::hold, "film:diffStrength")
                 }
             }
 

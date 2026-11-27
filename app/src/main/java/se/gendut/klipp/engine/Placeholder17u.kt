@@ -56,6 +56,10 @@ internal object Placeholder17u {
         val video = encodeVideo(thumb.bitmap, w, h)
         val audio = if (rate > 0 && channels > 0) encodeSilence(rate, channels.coerceIn(1, 2), durUs) else null
         val mux = MediaMuxer(out.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        // Klipp Lab: turned as the clip was shot (the develop gets the same), see Mcraw.rotationOf
+        // (or the turn chosen in the picker's Rotation)
+        val rotation = se.gendut.klipp.McrawFolder17u.rotFor(ctx, src) ?: thumb.rotation
+        if (rotation != 0) mux.setOrientationHint(rotation)
         try {
             val vt = mux.addTrack(video.first)
             val at = audio?.let { mux.addTrack(it.first) }

@@ -216,10 +216,14 @@ internal fun Transport(state: EditorState) {
     val playR by animateDpAsState(if (state.playing) 24.dp else 18.dp, spring(0.45f, 500f), label = "pr")
     Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            RoundIcon(Ic.Prev, stringResource(R.string.app_prev_frame), tint = K.OnSurfaceVar, modifier = Modifier.size(44.dp)) {
+            // Klipp Lab: loop – at the end, playback starts again from the start (accent while on)
+            RoundIcon(Ic.Loop, stringResource(R.string.app_loop), tint = if (state.loop) K.Primary else K.OnSurfaceVar, modifier = Modifier.size(38.dp).testTag("loop")) {
+                state.loop = !state.loop
+            }
+            RoundIcon(Ic.Prev, stringResource(R.string.app_prev_frame), tint = K.OnSurfaceVar, modifier = Modifier.size(40.dp)) {
                 state.playing = false; state.playhead = snapFrame((state.playhead - FRAME).coerceAtLeast(0f))
             }
-            RoundIcon(Ic.Next, stringResource(R.string.app_next_frame), tint = K.OnSurfaceVar, modifier = Modifier.size(44.dp)) {
+            RoundIcon(Ic.Next, stringResource(R.string.app_next_frame), tint = K.OnSurfaceVar, modifier = Modifier.size(40.dp)) {
                 state.playing = false; state.playhead = snapFrame(state.playhead + FRAME)
             }
         }

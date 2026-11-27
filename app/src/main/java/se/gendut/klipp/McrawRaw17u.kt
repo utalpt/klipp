@@ -165,12 +165,18 @@ private fun followDevelop(g: se.gendut.klipp.engine.ClipGrade, ei: Int, out: Str
  * curve and gamut as its input. A clip whose last OpenDRT node can't make HLG (a film, a window, a mix under 100 %) is
  * left to the user. Empty = nothing to add. Reads the develops' index: small, but off the main thread when it can be.
  */
-fun mcrawHlgGrades17u(ctx: android.content.Context, clips: List<Pair<Long, android.net.Uri?>>, gs: GradeState): Map<Long, se.gendut.klipp.engine.ClipGrade> {
+fun mcrawHlgGrades17u(ctx: android.content.Context, clips: List<Pair<Long, android.net.Uri?>>, gs: GradeState, keepLuts: Boolean = false): Map<Long, se.gendut.klipp.engine.ClipGrade> {
     val out = LinkedHashMap<Long, se.gendut.klipp.engine.ClipGrade>()
     for ((id, uri) in clips) {
         val info = McrawStore17u.infoOf(ctx, uri) ?: continue
         val g = gs.of(id)
         if (g.hlgReady) continue
+        // a whole film renders the picture itself: OpenDRT after it is left out (ClipGrade.afterFilm) - adding one
+        // would only stack a new OpenDRT node at every HDR export
+        if (g.nodes.any { it.film?.effectsOnly == false && !it.isNeutral }) continue
+        // with SDR grades going into HLG (ExportSettings.sdrHlg) a clip graded with a LUT keeps its LUT as its rendering:
+        // OpenDRT after a log → Rec.709 LUT would convert twice
+        if (keepLuts && g.nodes.any { it.lut != null && !it.isNeutral }) continue
         val last = g.chain.lastOrNull { !it.isNeutral }
         if (last?.drt != null) continue
         val drt = se.gendut.klipp.engine.Drt(input = info.out)

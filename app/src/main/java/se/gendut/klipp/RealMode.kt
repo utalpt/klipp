@@ -435,7 +435,16 @@ fun PlaybackSync(controller: ProjectController, playback: ProgramPlayback, state
                 playback.hint(pos)
                 if (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_ENDED) { state.playhead = pos.toFloat(); loopHead[0] = state.playhead }
                 when {
-                    p.playbackState == Player.STATE_ENDED -> state.playing = false
+                    // Klipp Lab: loop on – from the start again
+                    p.playbackState == Player.STATE_ENDED -> if (state.loop) {
+                        state.playhead = 0f
+                        val e = playback.start(0.0)
+                        if (e != null) { onError(e); state.playing = false }
+                    } else {
+                        // Klipp Lab: at the end, back to the start (the picture was black at the very end)
+                        state.playing = false
+                        state.playhead = 0f
+                    }
                     // the player paused itself (e.g. headphones unplugged) – not while its start waits for the first frame
                     !p.playWhenReady -> if (!playback.startPending) state.playing = false
                     // after a reload the player is idle for a moment before it starts buffering – that is not a

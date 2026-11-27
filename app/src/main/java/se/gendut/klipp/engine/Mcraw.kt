@@ -48,8 +48,26 @@ object Mcraw {
 
     class Probe(val summary: String, val log: String, val preview: Bitmap?, val logFile: File?)
 
-    /** A picker card's preview (the middle frame, padding rows cut off) and what the file is. */
-    class Thumb(val bitmap: Bitmap?, val width: Int, val height: Int, val fps: Double, val seconds: Double)
+    /**
+     * A picker card's preview (the middle frame, padding rows cut off, as the sensor gives it) and what the file is.
+     * [rotation]: how far (clockwise) to turn the picture to show it as shot, see [rotationOf].
+     */
+    class Thumb(val bitmap: Bitmap?, val width: Int, val height: Int, val fps: Double, val seconds: Double, val rotation: Int = 0)
+
+    /**
+     * Klipp Lab: how far (degrees, clockwise) a MotionCam clip's picture must be turned to stand as it was shot.
+     * MotionCam doesn't turn the RAW: each frame's metadata has the phone's "orientation" (0 portrait, 1 portrait
+     * upside down, 2 landscape, 3 landscape the other way round), and the container the sensor's mounting
+     * ("sensorOrientation", 90 on the 17 Ultra's back cameras). Checked on three 17 Ultra clips (landscape 2, portrait
+     * 0, turned round 3); a clip shot with the phone turned round showed upside down (reported by @kavascript).
+     * Files with no orientation (CRAW, DNG folders, an older MotionCam): 0.
+     */
+    fun rotationOf(container: JSONObject?, firstFrame: JSONObject?): Int {
+        val o = firstFrame?.optInt("orientation", -1) ?: -1
+        val phone = when (o) { 0 -> 0; 1 -> 180; 2 -> 90; 3 -> 270; else -> return 0 }
+        val sensor = container?.optInt("sensorOrientation", 90) ?: 90
+        return ((sensor - phone) % 360 + 360) % 360
+    }
 
     fun thumb(ctx: Context, uri: Uri): Thumb? {
         if (!available) return null
@@ -79,7 +97,7 @@ object Mcraw {
                 }
                 hh = ch
             }
-            return Thumb(bmp, w, hh, fps, dur + if (fps > 0) 1 / fps else 0.0)
+            return Thumb(bmp, w, hh, fps, dur + if (fps > 0) 1 / fps else 0.0, rotationOf(info.optJSONObject("container"), ff))
         } catch (_: Throwable) {
             return null
         } finally { nativeClose(h); pfd.close() }

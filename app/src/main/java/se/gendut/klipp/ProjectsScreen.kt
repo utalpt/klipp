@@ -144,8 +144,10 @@ data class NewProjectSpec(
  * Resolution preset (the null preset = like the first clip). [key] is stable (Swedish, used in test tags and
  * for selection); [label] and [hint] are localized when read.
  */
-data class Preset(val key: String, @StringRes val labelRes: Int, val w: Int, val h: Int, private val hintText: String, @StringRes val hintRes: Int = 0) {
-    val label: String get() = Str.t(labelRes)
+data class Preset(val key: String, @StringRes val labelRes: Int, val w: Int, val h: Int, private val hintText: String, @StringRes val hintRes: Int = 0,
+                  /** Klipp Lab: a label not in the strings (the cinema formats made from the project's size) */
+                  private val labelText: String = "") {
+    val label: String get() = if (labelRes != 0) Str.t(labelRes) else labelText
     val hint: String get() = if (hintRes != 0) Str.t(hintRes) else hintText
 }
 
@@ -164,6 +166,28 @@ val PRESETS = listOf(
     Preset("Flat 1.85", R.string.projectsscreen_preset_flat_185, 1998, 1080, "", R.string.projectsscreen_preset_flat_185_hint),
     Preset("Klassisk 4:3", R.string.projectsscreen_preset_classic, 1440, 1080, "4:3 · 1440×1080"),
 )
+/**
+ * Klipp Lab: the cinema formats (as in the Rawr 17U fork's video crop), made from the project's frame [w]×[h]: the widest
+ * that fits in it (at least 16:9 tall) at that ratio - the same width for the wide ones, the same height for the taller
+ * ones - so they keep the clips' resolution (4096×2560 → 2.39 at 4096×1712). Sides even, height a multiple of 8.
+ */
+fun cinemaPresets(w: Int, h0: Int, fromSource: Boolean = false): List<Preset> {
+    if (w <= 0 || h0 <= 0) return emptyList()
+    // (from the project's size: at least a 16:9 box - a project already in a wide format doesn't shrink the taller ones,
+    // 3840×1600 still gives 1.66 at 3584×2160, not 2656×1600. From the clips' own picture [fromSource]: that box as it is,
+    // e.g. a MotionCam open gate 4096×3072 - the crops of the whole sensor)
+    val h = if (fromSource) h0 else maxOf(h0, w * 9 / 16)
+    val list = listOf(
+        "1.43" to "IMAX 70 mm", "1.66" to "European widescreen", "1.85" to "Flat", "1.90" to "DCI / IMAX digital",
+        "2.00" to "Univisium", "2.20" to "70 mm Todd-AO", "2.39" to "Scope", "2.76" to "Ultra Panavision 70", "2.71" to "XPan 65:24",
+    )
+    return list.map { (r, name) ->
+        val a = r.toDouble()
+        val (cw, ch) = if (a >= w.toDouble() / h) w to ((w / a).toInt() / 8 * 8) else ((h * a).toInt() / 2 * 2) to h
+        Preset("cine$r", 0, cw, ch, "$r:1 · ${cw}×$ch", labelText = if (r == "2.71") "XPan $r" else "Cinema $r · $name")
+    }
+}
+
 val FRAME_RATES = listOf(23.976, 24.0, 25.0, 29.97, 30.0, 48.0, 50.0, 59.94, 60.0, 100.0, 120.0)
 val SEQ_SAMPLE_RATES = listOf(44_100, 48_000, 96_000)
 
@@ -759,10 +783,12 @@ fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (NewProjectSpec) -> Unit) 
 
 /** Format: the presets, "like the first clip" ([auto]) and a custom format. onPick(preset, custom). */
 @Composable
-fun FormatPicker(selected: Preset?, custom: Boolean, auto: Boolean, onPick: (Preset?, Boolean) -> Unit) {
+fun FormatPicker(selected: Preset?, custom: Boolean, auto: Boolean, cinema: List<Preset> = emptyList(), onPick: (Preset?, Boolean) -> Unit) {
+    val all = PRESETS + cinema
     val opts = buildList {
         if (auto) add(Opt("auto", Str.t(R.string.projectsscreen_like_first_clip), Str.t(R.string.projectsscreen_like_first_clip_hint), key = "auto"))
         PRESETS.forEach { add(Opt(it.key, it.label, it.hint, key = it.key)) }
+        cinema.forEach { add(Opt(it.key, it.label, it.hint, key = it.key)) }
         add(Opt("custom", Str.t(R.string.projectsscreen_custom_format), Str.t(R.string.projectsscreen_custom_format_hint), key = "custom"))
     }
     val sel = if (custom || (!auto && selected == null)) "custom" else selected?.key ?: "auto"
@@ -770,7 +796,7 @@ fun FormatPicker(selected: Preset?, custom: Boolean, auto: Boolean, onPick: (Pre
         when (v) {
             "auto" -> onPick(null, false)
             "custom" -> onPick(null, true)
-            else -> onPick(PRESETS.first { it.key == v }, false)
+            else -> onPick(all.first { it.key == v }, false)
         }
     }
 }
@@ -833,10 +859,17 @@ fun ProjectSettingsDialog(
     onDismiss: () -> Unit,
     /** Extra section at the end (e.g. proxy/cache). */
     extra: @Composable () -> Unit = {},
-    onApply: (name: String, w: Int, h: Int, fps: Double, sampleRate: Int) -> Unit,
+    /** Klipp Lab: the largest picture among the clips (their files' size): the cinema formats are cut from it. */
+    source: Pair<Int, Int>? = null,
+    onApply: (name: String, w: Int, h: Int, fps: Double, sampleRate: Int, fill: Boolean) -> Unit,
 ) {
     var n by remember { mutableStateOf(name) }
-    var preset by remember { mutableStateOf(PRESETS.firstOrNull { it.w == width && it.h == height }) }
+    // Klipp Lab: the cinema formats cut from the clips' own picture (e.g. the whole sensor of a MotionCam open gate), else
+    // from the project's size
+    val cinema = remember(source) { source?.let { cinemaPresets(it.first, it.second, fromSource = true) } ?: cinemaPresets(width, height) }
+    var preset by remember { mutableStateOf((PRESETS + cinema).firstOrNull { it.w == width && it.h == height }) }
+    // Klipp Lab: a new shape - the clips fill the frame (cropped, as a cinema crop) or fit inside it (bars)
+    var fill by remember { mutableStateOf(true) }
     var w by remember { mutableStateOf(width.toString()) }
     var h by remember { mutableStateOf(height.toString()) }
     var f by remember { mutableStateOf<Double?>(FRAME_RATES.minByOrNull { kotlin.math.abs(it - fps) }) }
@@ -847,10 +880,19 @@ fun ProjectSettingsDialog(
         text = { androidx.compose.foundation.layout.Column {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
                 TextInput(stringResource(R.string.projectsscreen_name), n) { n = it }
-                FormatPicker(preset, preset == null, auto = false) { p, _ -> preset = p; if (p != null) { w = p.w.toString(); h = p.h.toString() } }
+                FormatPicker(preset, preset == null, auto = false, cinema = cinema) { p, _ -> preset = p; if (p != null) { w = p.w.toString(); h = p.h.toString() } }
+                if (source != null) Text("Cinema formats cut from the clips' ${source.first}×${source.second}", color = K.OnSurfaceVar, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
                 Row {
                     TextInput(stringResource(R.string.projectsscreen_width), w, Modifier.weight(1f), stacked = true, number = true) { w = it.filter(Char::isDigit).take(5); preset = null }
                     TextInput(stringResource(R.string.projectsscreen_height), h, Modifier.weight(1f), stacked = true, number = true) { h = it.filter(Char::isDigit).take(5); preset = null }
+                }
+                // Klipp Lab: only when the shape changes
+                val nw = w.toIntOrNull() ?: width; val nh = h.toIntOrNull() ?: height
+                if (nw > 0 && nh > 0 && kotlin.math.abs(nw.toDouble() / nh - width.toDouble() / height) > 0.01) {
+                    Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SpringChip("Fill the frame (crop)", fill, { fill = true }, Modifier.testTag("fmtFill"))
+                        SpringChip("Fit inside (bars)", !fill, { fill = false }, Modifier.testTag("fmtFit"))
+                    }
                 }
                 FpsPicker(f, auto = false) { f = it }
                 SampleRatePicker(sr) { sr = it }
@@ -867,7 +909,7 @@ fun ProjectSettingsDialog(
             FlatTextButton(onClick = {
                 val ww = (w.toIntOrNull() ?: width).coerceIn(16, 8192) / 2 * 2
                 val hh = (h.toIntOrNull() ?: height).coerceIn(16, 8192) / 2 * 2
-                onApply(n.ifBlank { name }, ww, hh, f ?: fps, sr)
+                onApply(n.ifBlank { name }, ww, hh, f ?: fps, sr, fill)
             }, modifier = Modifier.testTag("applySettings")) { Text(stringResource(R.string.projectsscreen_save)) }
         },
         dismissButton = { FlatTextButton(onClick = onDismiss) { Text(stringResource(R.string.projectsscreen_cancel)) } },

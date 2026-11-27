@@ -182,4 +182,5 @@
     <string name="app_net_timeout">Anslutningen tog för lång tid</string>
     <string name="app_render_defaults_hint">Rendera automatiskt, ta bort renderingar, proxy och cache gäller alla projekt</string>
     <string name="app_clip_volume_keyframe">Klippvolym · nyckelruta vid spelhuvudet</string>
+    <string name="app_loop">Loopa</string>
 </resources>

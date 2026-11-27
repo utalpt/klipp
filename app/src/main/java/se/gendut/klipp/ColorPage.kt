@@ -19,6 +19,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -401,6 +403,13 @@ fun ColorPage(
             state.playing = false
             if (state.playhead < c.start || state.playhead >= c.end) state.playhead = (c.start + c.end) / 2
         }
+        // Klipp Lab: a thin scrub bar for the whole timeline (the clips as segments, the playhead): drag or tap to move
+        // through the edit without the Edit page; the clip under the playhead becomes the one graded
+        ColorScrub(clips, state.playhead) { t ->
+            state.playing = false
+            state.playhead = t
+            clips.firstOrNull { t >= it.start && t < it.end }?.let { if (it.id != state.selected) state.selected = it.id }
+        }
         current?.let { rawControls(it) }
         NodeRow(
             current, g, node?.id, more,
@@ -525,6 +534,37 @@ private fun ClipStrip(clips: List<ColorClip>, current: Long?, gs: GradeState, on
         for ((i, c) in clips.withIndex()) key(c.id) {
             ClipThumb(i + 1, c, c.id == current, graded = gs.grades[c.id]?.isNeutral == false) { onPick(c) }
         }
+    }
+}
+
+/** Klipp Lab: the whole timeline as a thin bar under the clip thumbnails - the clips' segments and the playhead. */
+@Composable
+private fun ColorScrub(clips: List<ColorClip>, playhead: Float, onSeek: (Float) -> Unit) {
+    val total = clips.maxOfOrNull { it.end } ?: return
+    if (total <= 0f) return
+    val seg = K.SurfaceHighest; val line = K.Primary; val gap = K.Bg
+    val seek by androidx.compose.runtime.rememberUpdatedState(onSeek)
+    androidx.compose.foundation.Canvas(
+        Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 12.dp, vertical = 5.dp)
+            .pointerInput(total) {
+                detectTapGestures { o -> seek((o.x / size.width).coerceIn(0f, 1f) * total) }
+            }
+            .pointerInput(total) {
+                detectHorizontalDragGestures { ch, _ ->
+                    ch.consume(); seek((ch.position.x / size.width).coerceIn(0f, 1f) * total)
+                }
+            }
+            .testTag("colorScrub"),
+    ) {
+        val w = size.width; val h = size.height
+        for (c in clips) {
+            val x0 = c.start / total * w; val x1 = c.end / total * w
+            drawRoundRect(seg, androidx.compose.ui.geometry.Offset(x0 + 1f, 0f), androidx.compose.ui.geometry.Size((x1 - x0 - 2f).coerceAtLeast(1f), h),
+                androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+        }
+        val px = (playhead / total * w).coerceIn(0f, w)
+        drawLine(line, androidx.compose.ui.geometry.Offset(px, -2f), androidx.compose.ui.geometry.Offset(px, h + 2f), strokeWidth = 2.5.dp.toPx())
+        drawCircle(line, 4.dp.toPx(), androidx.compose.ui.geometry.Offset(px, h / 2))
     }
 }
 
@@ -659,7 +699,7 @@ private fun NodeTools(
     // Klipp Lab: previews for the LUT browser – the frame at the playhead (small), graded with each LUT in this node
     val lutTick = remember(current) { derivedStateOf { (current.srcAt(state.playhead) * 2).roundToInt() } }.value
     val lutFrame by produceState<Bitmap?>(null, current.uri, lutTick, editor, state.playing) {
-        if (editor != 3 || state.playing) return@produceState
+        if ((editor != 3 && editor != 6) || state.playing) return@produceState
         val uri = current.uri ?: return@produceState
         val f = Frames.load(ctx, uri, current.srcAt(state.playhead), exact = false) ?: return@produceState
         value = withContext(Dispatchers.Default) {
@@ -678,6 +718,99 @@ private fun NodeTools(
                 withContext(Dispatchers.Default) {
                     val g = lutBase.copy(nodes = lutBase.nodes.map { if (it.id == node.id) it.copy(lut = lut, lutMix = 1f) else it })
                     runCatching { g.at(sec).applyTo(frame).asImageBitmap() }.getOrNull()
+                }
+            }
+        }
+        p
+    }
+    // Klipp Lab: previews for the film browser – the same small frame through each film (or paper) in this node. A film
+    // is baked first (about 36,000 points through spektrafilm's chain), two at a time, kept in [FilmPreviewCache] (a
+    // closed strip or another tab doesn't bake them again while the frame and the rest of the grade stay); each
+    // bake's time goes to film_previews.txt
+    // Klipp Lab: a MotionCam / CRAW clip's develop curve - its grade keeps no input for the default S-Log3 develop
+    // ...and a 10-bit clip with nothing said about it (a log APV from the camera, George's mod S-Log3): the curve the
+    // clip's Input (EI) panel shows by default, S-Log3 - an 8-bit one stays Rec.709 (its film started on Rec.709 before)
+    val rawOut by produceState<String?>(null, current.uri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { se.gendut.klipp.engine.McrawStore17u.infoOf(ctx, current.uri)?.out }.getOrNull()
+                ?: current.uri?.let { u ->
+                    // (an HDR clip - HLG / PQ - is 10-bit too, but not log)
+                    val hdr = runCatching { se.gendut.klipp.engine.Perf.isHdr(ctx, u) }.getOrNull() == true
+                    val ten = runCatching { se.gendut.klipp.engine.VideoPipeline.bitDepth(ctx, u) }.getOrNull() ?: 8
+                    if (!hdr && ten >= 10) se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key else null
+                }
+        }
+    }
+    val filmBase = gs.of(current.id).let { g -> g.copy(nodes = g.nodes.map { if (it.id == node.id) it.copy(film = null) else it }) }
+    val filmPreview: FilmPreview? = remember(lutFrame, filmBase, node.id) {
+        val frame = lutFrame ?: return@remember null
+        val sec = current.srcAt(state.playhead)
+        val gate = kotlinx.coroutines.sync.Semaphore(2)  // Klipp Lab: two at a time (each ~0.2-1 s on one core)
+        val log = java.io.File(ctx.getExternalFilesDir(null), "film_previews.txt")
+        val where = "${current.uri}|$lutTick"
+        val p: FilmPreview = { film ->
+            val key = FilmPreviewCache.Key(where, filmBase, node.id, film, false)
+            FilmPreviewCache.get(key) ?: gate.withPermit {
+                FilmPreviewCache.get(key) ?: withContext(Dispatchers.Default) {
+                    val t0 = System.nanoTime()
+                    val g = filmBase.copy(nodes = filmBase.nodes.map { if (it.id == node.id) it.copy(film = film) else it })
+                    se.gendut.klipp.engine.FilmFx.noCache.set(true)
+                    val made1 = try { runCatching { g.at(sec).applyTo(frame).asImageBitmap() }.getOrNull() } finally { se.gendut.klipp.engine.FilmFx.noCache.set(false) }
+                    made1?.also { img ->
+                        FilmPreviewCache.put(key, img)
+                        runCatching { log.appendText("${java.time.LocalTime.now().withNano(0)} ${film.film}/${film.print}: ${(System.nanoTime() - t0) / 1_000_000} ms\n") }
+                    }
+                }
+            }
+        }
+        p
+    }
+    // Klipp Lab: the diffusion filters' cards – a filter shows around the lights, so the frame is made bigger (640 px),
+    // the film goes over all of it (its spread is measured on the whole picture) and the card is the brightest third
+    val detailFrame by produceState<Pair<Bitmap, android.graphics.Rect>?>(null, current.uri, lutTick, editor, state.playing) {
+        if (editor != 6 || state.playing) return@produceState
+        val uri = current.uri ?: return@produceState
+        val f = Frames.load(ctx, uri, current.srcAt(state.playhead), exact = false) ?: return@produceState
+        value = withContext(Dispatchers.Default) {
+            val b = f.asAndroidBitmap()
+            val w = 640; val h = (640f * b.height / b.width).roundToInt().coerceAtLeast(9)
+            val big = Bitmap.createScaledBitmap(b, w, h, true)
+            val cw = w / 3; val ch = (cw * 9 / 16).coerceAtMost(h)
+            val px = IntArray(w * h).also { big.getPixels(it, 0, w, 0, 0, w, h) }
+            var best = -1.0; var bx = 0; var by = 0
+            for (y in 0..(h - ch) step 8) for (x in 0..(w - cw) step 8) {
+                var sum = 0.0
+                for (yy in y until y + ch step 6) for (xx in x until x + cw step 6) {
+                    val c = px[yy * w + xx]
+                    val l = 0.2126 * ((c shr 16) and 255) + 0.7152 * ((c shr 8) and 255) + 0.0722 * (c and 255)
+                    sum += l * l
+                }
+                if (sum > best) { best = sum; bx = x; by = y }
+            }
+            big to android.graphics.Rect(bx, by, bx + cw, by + ch)
+        }
+    }
+    val filmDetail: FilmPreview? = remember(detailFrame, filmBase, node.id) {
+        val (frame, rect) = detailFrame ?: return@remember null
+        val sec = current.srcAt(state.playhead)
+        val gate = kotlinx.coroutines.sync.Semaphore(2)  // Klipp Lab: two at a time (each ~0.2-1 s on one core)
+        val log = java.io.File(ctx.getExternalFilesDir(null), "film_previews.txt")
+        val where = "${current.uri}|$lutTick"
+        val p: FilmPreview = { film ->
+            val key = FilmPreviewCache.Key(where, filmBase, node.id, film, true)
+            FilmPreviewCache.get(key) ?: gate.withPermit {
+                FilmPreviewCache.get(key) ?: withContext(Dispatchers.Default) {
+                    val t0 = System.nanoTime()
+                    val g = filmBase.copy(nodes = filmBase.nodes.map { if (it.id == node.id) it.copy(film = film) else it })
+                    se.gendut.klipp.engine.FilmFx.noCache.set(true)
+                    val out = try { runCatching { g.at(sec).applyTo(frame) }.getOrNull() } finally { se.gendut.klipp.engine.FilmFx.noCache.set(false) }
+                    out?.let { o ->
+                        val r = android.graphics.Rect(rect.left * o.width / frame.width, rect.top * o.height / frame.height, rect.right * o.width / frame.width, rect.bottom * o.height / frame.height)
+                        Bitmap.createBitmap(o, r.left, r.top, r.width().coerceAtLeast(1), r.height().coerceAtLeast(1)).asImageBitmap()
+                    }?.also { img ->
+                        FilmPreviewCache.put(key, img)
+                        runCatching { log.appendText("${java.time.LocalTime.now().withNano(0)} detail ${film.diffusion}/${film.diffusionStrength}: ${(System.nanoTime() - t0) / 1_000_000} ms\n") }
+                    }
                 }
             }
         }
@@ -746,8 +879,20 @@ private fun NodeTools(
                             }
                         }
                     })
-                    3 -> NodeLutEditor(node, onLive = ::live, onCommit = ::commit, onImport = onImportLut, preview = lutPreview)
-                    6 -> FilmEditor(node, onCommit = ::commit, onLive = { gs.previewNode(current.id, it) })
+                    3 -> NodeLutEditor(node, onLive = ::live, onCommit = ::commit, onImport = onImportLut, preview = lutPreview,
+                        filmBefore = node.film?.effectsOnly == false || gs.of(current.id).nodes.takeWhile { it.id != node.id }.any { it.film?.effectsOnly == false && !it.isNeutral })
+                    6 -> FilmEditor(node, onCommit = ::commit,
+                        // Klipp Lab: paused, a dragged film control also sets the node live, so the still on the picture
+                        // shows it – over a pre-rendered part the player plays the rendered file and showed nothing
+                        onLive = { if (!state.playing) gs.liveNode(current.id, it); gs.previewNode(current.id, it) },
+                        preview = filmPreview, detail = filmDetail,
+                        // a held card: as a dragged control – the still on the picture is the grade with that film
+                        // (paused, a pre-rendered part plays its file, so the player alone showed nothing)
+                        onHold = { held ->
+                            if (held != null) { gs.liveNode(current.id, held); gs.previewNode(current.id, held) }
+                            else { gs.liveNode(current.id, node); gs.previewNode(current.id, node); scope.launch { gs.endLive() } }
+                        },
+                        clipInput = gs.of(current.id).let { g -> g.ei?.input ?: g.nodes.firstNotNullOfOrNull { it.drt }?.input ?: rawOut })
                     4 -> QualifierEditor(current.id, node, gs, onLive = ::live, onCommit = ::commit, onPick = {
                         if (gs.pick != null) { gs.pick = null; return@QualifierEditor }
                         val clip = current

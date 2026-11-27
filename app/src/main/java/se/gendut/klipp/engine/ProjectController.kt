@@ -107,6 +107,8 @@ class ProjectController(
         McrawStore17u.relink = { old, new -> relinkMcraw17u(old, new) }
         McrawStore17u.has = { u -> uris.containsValue(u) }
         McrawStore17u.remove = { u -> uris.filterValues { it == u }.keys.toList().takeIf { it.isNotEmpty() }?.let { deleteMedia(it, emptyList()) } }
+        // (an import done: what it left as placeholders is developed now, not at the project's next change)
+        McrawStore17u.kick = { runCatching { McrawStore17u.finishDrafts(context, uris.values.toList()) } }
     }
 
     /**
@@ -899,6 +901,13 @@ class ProjectController(
             ?: if (snap.media.isEmpty()) Str.t(R.string.mainactivity_no_media_yet) else Str.p(R.plurals.projectcontroller_media_count, snap.media.size, snap.media.size)
         state.applyEngine(toUi(snap), snap.undoIds, snap.redoIds, snap.editSerial)
         state.linkedSelection = snap.linkedSelection
+        // From Klipp 0.22.0 by Flabbjaxaren (fc8d8f4):
+        // an edit or an undo that shortens the film leaves no playhead after its end: it stayed there (a black picture),
+        // and was saved with the project
+        snap.sequence?.duration?.takeIf { it >= 0.0 && !state.playing && state.playhead > it + 1e-3 }?.let { end ->
+            state.playhead = end.toFloat()
+            engine.tryExec("playhead.set", JSONObject().put("time", frameTicks(end)))
+        }
         snap.sequence?.let { q ->
             state.markers = q.markers.map { it.time.toFloat() }
             q.video.indexOfFirst { it.id == q.videoTarget }.takeIf { it in 0..2 }?.let { state.targetVideo = 2 - it }
@@ -1599,14 +1608,72 @@ class ProjectController(
     }
 
     /** Project settings: resolution, frame rate, audio sample rate. */
-    fun setSequenceSettings(width: Int, height: Int, fps: Double, sampleRate: Int?, scaleMotion: Boolean = false) = scope.launch { editLock.withLock {
+    fun setSequenceSettings(width: Int, height: Int, fps: Double, sampleRate: Int?, scaleMotion: Boolean = false, fill: Boolean = false) = scope.launch { editLock.withLock {
+        val old = snapshot.sequence?.let { it.width to it.height }
+        val before = snapshot.sequence?.video.orEmpty().flatMap { it.clips }
         val p = JSONObject().put("width", width).put("height", height).put("fps", fps).put("scaleMotion", scaleMotion)
         sampleRate?.let { p.put("sampleRate", it) }
         if (snapshot.sequence == null) engine.tryExec("file.newSequence", newSeqParams().put("width", width).put("height", height).put("fps", fps).apply { sampleRate?.let { put("sampleRate", it) } })
         else engine.tryExec("sequence.settings", p).onFailure { onMessage(Str.t(R.string.projectcontroller_change_failed, friendly(it.message))) }
+        if (old != null && old.first > 0 && old.second > 0 && (old.first != width || old.second != height)) refitClips(before, old.first, old.second, width, height, fill)
         refresh()
         onMessage(Str.t(R.string.projectcontroller_sequence_now, width, height, "%.3f".format(fps).trimEnd('0').trimEnd(',', '.')))
     } }
+
+    /**
+     * Klipp Lab: the clips after a new frame size. A clip's Scale 100 % is its picture fitted into the frame (Klipp's own
+     * placement), and its Position is in sequence pixels: kept as they were, a clip sat off-centre in the new frame (a
+     * 4096×2560 project made 2.39 showed the picture low and cut at the bottom). A clip at the frame's centre stays
+     * centred, a moved one keeps its offset from the centre in proportion; [fill] scales a clip that was fitted or filling
+     * to fill the new frame (cropped - the cinema crop), otherwise to fit it (bars). A scale set by hand, and clips with
+     * position or scale keyframes, stay as they are. The engine's own "scale motion" isn't used: it scales Scale as if
+     * it were in source pixels, which made the picture smaller here.
+     */
+    private suspend fun refitClips(clips: List<ClipSnap>, w0: Int, h0: Int, w1: Int, h1: Int, fill: Boolean) {
+        val k = minOf(w1.toDouble() / w0, h1.toDouble() / h0)
+        val sizes = HashMap<Long, Pair<Int, Int>?>()
+        fun fillRatio(item: Long, w: Int, h: Int): Double? {
+            val sz = sizes.getOrPut(item) { sourceSize(item) } ?: return null
+            val fx = w.toDouble() / sz.first; val fy = h.toDouble() / sz.second
+            return maxOf(fx, fy) / minOf(fx, fy)
+        }
+        for (c in clips) {
+            if (c.text != null || c.kf.containsKey(KfKeys.POSITION) || c.kf.containsKey(KfKeys.SCALE)) continue
+            val x = c.x ?: (w0 / 2.0); val y = c.y ?: (h0 / 2.0)
+            if (c.x != null || c.y != null) {
+                val nx = w1 / 2.0 + (x - w0 / 2.0) * k; val ny = h1 / 2.0 + (y - h0 / 2.0) * k
+                engine.tryExec("effects.setParam", JSONObject().put("clip", c.id).put("effect", "motion").put("param", "position").put("value", JSONArray().put(nx).put(ny)))
+            }
+            val r0 = fillRatio(c.item, w0, h0) ?: continue
+            val fitted = kotlin.math.abs(c.scale - 100.0) < 0.5; val filling = kotlin.math.abs(c.scale - 100.0 * r0) < 0.5
+            if (!fitted && !filling) continue
+            val r1 = fillRatio(c.item, w1, h1) ?: continue
+            val ns = if (fill) 100.0 * r1 else 100.0
+            if (kotlin.math.abs(ns - c.scale) > 0.01) engine.tryExec("effects.setParam", JSONObject().put("clip", c.id).put("effect", "motion").put("param", "scale").put("value", ns))
+        }
+    }
+
+    /**
+     * Klipp Lab: the largest picture among the timeline's video clips (rotation applied), read from their files - the
+     * base for the cinema formats (a MotionCam open-gate develop at 4096×3072 gives 2.39 at 4096×1712). Null = none.
+     */
+    suspend fun largestSource(): Pair<Int, Int>? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        snapshot.sequence?.video.orEmpty().flatMap { it.clips }.filter { it.text == null }.map { it.item }.distinct()
+            .mapNotNull { sourceSize(it) }.maxByOrNull { it.first.toLong() * it.second }
+    }
+
+    /** A clip's picture size as shown (rotation applied), read from its file; null = unknown. */
+    private fun sourceSize(item: Long): Pair<Int, Int>? = runCatching {
+        val u = uriOf(item) ?: return null
+        val m = android.media.MediaMetadataRetriever()
+        try {
+            m.setDataSource(context, u)
+            val w = m.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: return null
+            val h = m.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: return null
+            val rot = m.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            if (rot % 180 != 0) h to w else w to h
+        } finally { m.release() }
+    }.getOrNull()?.takeIf { it.first > 0 && it.second > 0 }
 
     /** Linked selection on/off (the engine doesn't save it in the project, so it goes in the side file). */
     fun setLinkedSelection(on: Boolean) = scope.launch { editLock.withLock {
@@ -2259,7 +2326,7 @@ class ProjectController(
                 engine.tryExec("graphics.setText", JSONObject().put("clip", id).put("text", it)).onFailure { e -> onMessage(friendly(e.message)) }
                 engine.tryExec("clip.rename", JSONObject().put("clip", id).put("name", it.lines().firstOrNull()?.take(40) ?: Str.t(R.string.projectcontroller_default_title)))
             }
-            size?.let { setParam(id, "graphic_text", "size", it.toDouble()) }
+            size?.let { setParam(id, "graphic_text", "size", it.coerceIn(1f, se.gendut.klipp.TITLE_SIZE_ENGINE_MAX).toDouble()) }
             color?.let { setParam(id, "graphic_text", "fill_color", "#%06x".format(it and 0xFFFFFF)) }
             look?.let { setParam(id, "graphic_text", "name", it) }
             refresh()
@@ -2670,6 +2737,7 @@ class ProjectController(
 
     fun close() {
         if (McrawStore17u.relink != null) McrawStore17u.relink = null
+        McrawStore17u.kick = null
         // a pending save happens now (a couple of seconds at most), before the engine is released
         if (saveJob?.isActive == true) {
             saveJob?.cancel()

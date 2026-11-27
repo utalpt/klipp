@@ -859,7 +859,11 @@ object FilmFx {
     }
 
     /** The preparation for the settings (the same object for the same settings). */
-    fun setup(f: Film): Setup = synchronized(setups) { setups[f] } ?: Setup(with(Spektra) { f.forEffects() }).also { s -> synchronized(setups) { setups[f] = s } }
+    fun setup(f: Film): Setup = synchronized(setups) { setups[f] } ?: Setup(with(Spektra) { f.forEffects() }).also { s -> if (noCache.get() != true) synchronized(setups) { setups[f] = s } }
+
+    /** Klipp Lab: set on a thread making the film browser's previews – its setups are not kept, so the few kept stay the
+     *  ones playback uses (the browser goes through every film and paper). */
+    val noCache = ThreadLocal<Boolean>()
 
     /** The image sizes playback used most recently (to prepare the kernels in advance, not on the GL thread). */
     private val recentSizes = java.util.concurrent.CopyOnWriteArrayList<Triple<Int, Int, Int>>()

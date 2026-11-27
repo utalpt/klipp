@@ -125,6 +125,7 @@ fun Storage17uRows(ctx: Context) {
     val scope = rememberCoroutineScope()
     var mcraw by remember { mutableStateOf(0L) }
     var rev by remember { mutableStateOf(0) }
+    var ask by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(rev, se.gendut.klipp.engine.McrawStore17u.revision) { mcraw = withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.bytes(ctx) } }
     Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -132,13 +133,26 @@ fun Storage17uRows(ctx: Context) {
             Text("%.1f GB · made when a .mcraw or .CRAW is imported; removed on their own when no project uses them. Clear: they are made again only by importing the file again.".format(mcraw / 1e9),
                 color = K.OnSurfaceVar, fontSize = 12.sp)
         }
-        FlatTextButton(onClick = {
-            scope.launch {
-                withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.clearAll(ctx) }
-                rev++
-            }
-        }, modifier = Modifier.testTag("set:clearMcraw")) { Text("Clear") }
+        FlatTextButton(onClick = { ask = true }, modifier = Modifier.testTag("set:clearMcraw")) { Text("Clear") }
     }
+    // (asked first, as in Klipp 0.22 – Flabbjaxaren, 92aaad5: the develops projects use go too, and their clips are
+    // offline until the .mcraw / .CRAW is imported again)
+    if (ask) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { ask = false },
+        title = { Text("Clear the RAW develops?") },
+        text = { Text("The develops your projects use go too: their clips are offline until the .mcraw or .CRAW files are imported again.") },
+        confirmButton = {
+            FlatTextButton(onClick = {
+                ask = false
+                scope.launch {
+                    withContext(Dispatchers.IO) { se.gendut.klipp.engine.McrawStore17u.clearAll(ctx) }
+                    rev++
+                }
+            }, modifier = Modifier.testTag("set:clearMcraw:yes")) { Text("Clear") }
+        },
+        dismissButton = { FlatTextButton(onClick = { ask = false }) { Text("Cancel") } },
+        containerColor = K.SurfaceHigh,
+    )
     var lim by remember { mutableStateOf(se.gendut.klipp.engine.StorageWarn17u.limitGb(ctx)) }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
         Text("Warn when Klipp Lab uses more than", color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

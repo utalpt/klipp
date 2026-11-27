@@ -4,8 +4,8 @@
 > `xiaomi-17u` branch. It installs beside Klipp as **Klipp Lab** (`x17u.klipp.editor`). Built and tested on a Xiaomi
 > 17 Ultra; runs on any 64-bit Android 10+ phone. Issues with the fork's own features go here, not to Klipp.
 
-**⬇️ [Download the latest test build](https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk)**
-(installs over the previous one) · 📝 [Changelog](CHANGELOG-17U.md)
+**⬇️ [Latest release](https://github.com/utalpt/klipp/releases/latest)** · [latest test build](https://github.com/utalpt/klipp/releases/download/debug/klipp17u-debug.apk)
+(each installs over the previous one) · 📝 [Changelog](CHANGELOG-17U.md)
 
 ## 🧪 What Klipp Lab adds
 
@@ -15,9 +15,10 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 
 | | |
 |---|---|
-| **MotionCam RAW** (.mcraw) | Developed on the GPU into a log video (S-Log3, LogC4, F-Log2, DaVinci Intermediate…). Clips go on the timeline at once and switch to their develop when ready. Needs a 10-bit HEVC encoder. |
+| **MotionCam RAW** (.mcraw) | Developed on the GPU into a log video (S-Log3, LogC4, F-Log2, DaVinci Intermediate…). Clips go on the timeline at once and switch to their develop when ready. Needs a 10-bit HEVC encoder. In Klipp too since 0.22.0-beta.1, ported from here (#12). |
 | **Live EI** | The EI shows at once, as on a cinema camera; Develop bakes it in from the RAW. A pasted grade carries the EI to every RAW clip. |
-| **Cinematic RAW** (.CRAW) | By [matthew777777](https://github.com/matthew777777), with his app's decoder. Same develop as MotionCam RAW. Android 12+. |
+| **Orientation** | MotionCam clips stand as shot - portrait, or with the phone turned round (each frame's orientation, or the one locked in MotionCam). A Rotation choice in the picker turns the selected clips by hand. Reported by kavascript on Telegram. |
+| **Cinematic RAW** (.CRAW) | By [matthew777777](https://github.com/matthew777777), with his app's decoder. Same develop as MotionCam RAW. Android 12+. His import is in Klipp too since 0.22.0-beta.1 (#11); here CFA takes are developed on the GPU. |
 
 ### 🎨 Color and HDR
 
@@ -26,7 +27,9 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 | **HLG export** | From each clip's OpenDRT node: Rec.2100 HLG, 10-bit HEVC, shown as HDR by Google Photos. Needs a 10-bit HDR HEVC encoder. |
 | **Dolby Vision export** | The same grade as Dolby Vision 8.4, with metadata from the edited frames. Dolby Vision clips in come out as Dolby Vision again. Only on phones with a Dolby Vision encoder (the 17 Ultra has one). |
 | **EI and white balance per clip** | Applied before all nodes, as in a raw developer; for George Kiarie's 17 Ultra camera mods also where the sensor clips. |
-| **LUT browser** | Previews of the current frame, groups, fast .zip import. |
+| **SDR grades in HLG** | Clips graded with a LUT (or with no OpenDRT node) go into an HLG export too, converted from SDR as ITU-R BT.2408 does it (SDR white at 203 nits). |
+| **Film previews** | Cards with the current frame through each film, print paper, diffusion and strength; the film's input follows the clip's log. Whole film is the last rendering, Effects only keeps OpenDRT for HDR. |
+| **LUT browser** | Previews of the current frame, groups, fast .zip import (the faster .cube reading is in Klipp 0.22 too, #13). |
 
 ### ✂️ Editing and export
 
@@ -34,7 +37,10 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 - 🧲 **Close gaps** on a track or after a clip
 - ⏱️ **Standard frame rates** for phone clips (58.6 → 60)
 - 📈 **Bitrates above the encoder's limit** (up to 300 Mbps)
+- 🎞️ **Cinema formats** 1.43 to 2.76 and XPan 2.71, cut from the clips' own picture (an open gate keeps its full height), with Fill / Fit
 - 📤 **Export screen** with progress, time left and speed · clip count on the edit page
+- 📅 **File date:** the first clip's (as shot) or the export time
+- 🎚️ **Color page:** a thin scrub bar with the whole timeline · Loop button under the picture
 
 ### 📱 App
 
@@ -51,7 +57,10 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 </details>
 
 <details open>
-<summary><b>🔁 Sent to Klipp and merged</b> (Klipp 0.21.0-beta.2, PRs #4–#10)</summary>
+<summary><b>🔁 Sent to Klipp and merged</b> (Klipp 0.21.0-beta.2: #4–#10 · Klipp 0.22.0-beta.1: #12, #13)</summary>
+
+- MotionCam RAW import with the GPU develop, ported by Flabbjaxaren (#12)
+- Faster .cube LUT import (#13)
 
 - HLG export from the grade (#6)
 - LUT browser with previews and groups (#5)
@@ -69,7 +78,8 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 [Klipp](https://github.com/Flabbjaxaren/klipp) by Flabbjaxaren, on the [FilmCraft](https://github.com/storytold/filmcraft)
 engine. Film simulation from [spektrafilm](https://github.com/andreavolpato/spektrafilm) by Andrea Volpato et al.
 [OpenDRT](https://github.com/jedypod/open-display-transform) by Jed Smith. EI relation and slow-mo idea from George
-Kiarie's RawViewer. Cinematic RAW Studio .CRAW import by matthew777777, with his app's decoder (Apache-2.0). MotionCam
+Kiarie's RawViewer. Cinematic RAW Studio .CRAW import by matthew777777, with his app's decoder (Apache-2.0). Fixes to the
+MotionCam develop from Klipp 0.22 by Flabbjaxaren (exact develop size, the encoder's end, placeholders developed again). MotionCam
 RAW read with [motioncam-decoder](https://github.com/mirsadm/motioncam-decoder) (Apache-2.0, with the MIT-licensed JSON
 for Modern C++ by Niels Lohmann and SIMDe). Dolby Vision approach from Dolby's
 [dolby-vision-editor](https://github.com/DolbyLaboratories/dolby-vision-editor) sample (BSD-3-Clause-Clear). HLG with

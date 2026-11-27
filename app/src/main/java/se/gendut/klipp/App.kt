@@ -373,13 +373,13 @@ private fun KlippAppContent(
         lastExportAsk = settings to name
         // Klipp Lab: HLG with MotionCam clips – the OpenDRT they need goes into their grades (one undo step, seen in Color)
         if (settings.hlg) {
-            val fix = mcrawHlgGrades17u(context, c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to c.uriOf(it.item) } }, gs)
+            val fix = mcrawHlgGrades17u(context, c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.filter { it.text == null }.map { it.id to c.uriOf(it.item) } }, gs, keepLuts = settings.sdrHlg)
             if (fix.isNotEmpty()) gs.setAll(fix)
         }
         // color-graded clips always become SDR (grading is done in SDR) – except HLG made from the grades' OpenDRT
         val graded = gs.grades.values.any { !it.isNeutral } || !lookOf(grade).isNeutral
         val liveIds = c.snapshot.sequence?.video.orEmpty().flatMap { t -> t.clips.map { it.id } }.toSet()
-        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.filterKeys { k -> k in liveIds }.values, lookOf(grade))) it.copy(hlg = false) else it }
+        val st = (if (graded) settings.copy(hdr = false) else settings).let { if (it.hlg && !hlgReadyOf(gs.grades.filterKeys { k -> k in liveIds }.values, lookOf(grade), sdrOk = it.sdrHlg)) it.copy(hlg = false) else it }
         // everything the export reads, taken now: the job outlives this screen (and its controller)
         val snap = c.snapshot
         val uris = c.frozenUris()
@@ -494,6 +494,7 @@ private fun KlippAppContent(
             // Klipp Lab: MotionCam clips count as ready – choosing HLG gives them OpenDRT (see runExport)
             hlgReady = hlgReadyOf(gradesForHlg17u, lookOf(grade)),
             hlgWhyNot = hlgWhyNot(gradesForHlg17u, lookOf(grade)),
+            hlgSdrOk = hlgReadyOf(gradesForHlg17u, lookOf(grade), sdrOk = true),
             onDismiss = { exportAsk = false },
         ) { st, name -> exportAsk = false; runExport(st, name) }
     }
@@ -956,6 +957,12 @@ private fun KlippAppContent(
             }
     ) {
         val landscape = maxWidth > maxHeight
+        // landscape: the picture's share of the width (the rest is the timeline; the dock under the picture follows it) -
+        // never so narrow that the transport and the dock don't fit (360 dp). Klipp Lab: from Klipp 0.22.0-beta.2 by
+        // Flabbjaxaren (61b77e7), whose dock had stayed at 46 % over the timeline at a 30 % split
+        var splitSet by remember { androidx.compose.runtime.mutableFloatStateOf(AppPrefs.landscapeSplit(context)) }
+        val minSplit = (360.dp / maxWidth).coerceIn(0.3f, 0.46f)
+        val split = splitSet.coerceIn(minSplit, 0.75f)
         // the program monitor's height in portrait (drag the handle under the transport; double tap = the project's shape again)
         // Klipp Lab: by default the picture's own shape (16:9, 4:3, 9:16…) so no grey bands are left around it, and a
         // height set by hand is kept per shape – one height for every project left a 16:9 picture in a square box after
@@ -1129,7 +1136,6 @@ private fun KlippAppContent(
         if (landscape) {
             // landscape: picture (and source) on the left, the modes with the timeline on the right
             // Klipp Lab: the split between the two sides can be dragged (the grip between them; double tap = back)
-            var split by remember { androidx.compose.runtime.mutableFloatStateOf(AppPrefs.landscapeSplit(context)) }
             val rowPx = with(density) { maxWidth.toPx() }
             Row(Modifier.fillMaxSize().safeArea17u()) {
                 Column(Modifier.weight(split).fillMaxHeight()) {
@@ -1139,9 +1145,9 @@ private fun KlippAppContent(
                     if (sourceMedia == null) Spacer(Modifier.height(92.dp))
                 }
                 SplitHandle(
-                    onDrag = { dx -> split = (split + dx / rowPx).coerceIn(0.3f, 0.75f) },
+                    onDrag = { dx -> splitSet = (split + dx / rowPx).coerceIn(minSplit, 0.75f) },
                     onEnd = { AppPrefs.setLandscapeSplit(context, split) },
-                    onReset = { haptics.tick(); split = 0.46f; AppPrefs.setLandscapeSplit(context, split) },
+                    onReset = { haptics.tick(); splitSet = 0.46f; AppPrefs.setLandscapeSplit(context, splitSet) },
                 )
                 Box(Modifier.weight(1f - split).fillMaxHeight()) {
                     Pages(Modifier.fillMaxSize())
@@ -1168,7 +1174,7 @@ private fun KlippAppContent(
             bottomBar,
             enter = slideInVertically(spring(0.7f, 400f)) { it } + fadeIn(),
             exit = slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(if (landscape) 0.46f else 1f),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(if (landscape) split else 1f),
         ) {
         Column(
             Modifier.windowInsetsPadding(WindowInsets.navigationBars)
@@ -1251,9 +1257,12 @@ private fun KlippAppContent(
             }
             if (showSettings) {
                 val q = controller.snapshot.sequence
+                // Klipp Lab: the clips' largest picture, for the cinema formats (read from the files, off the main thread)
+                val source by androidx.compose.runtime.produceState<Pair<Int, Int>?>(null, controller.revision) { value = controller.largestSource() }
                 ProjectSettingsDialog(
                     controller.currentName, q?.width ?: 1920, q?.height ?: 1080, controller.snapshot.fps, q?.sampleRate ?: 48000,
                     onDismiss = { showSettings = false },
+                    source = source,
                     extra = {
                         PresetRow(stringResource(R.string.app_render_timeline), stringResource(R.string.app_render_timeline_hint), false) {
                             showSettings = false; se.gendut.klipp.engine.RenderCache.halted = false; se.gendut.klipp.engine.RenderCache.renderAll = true
@@ -1261,10 +1270,10 @@ private fun KlippAppContent(
                         // (rendering automatically and deleting renders apply to every project: they are in the app's settings)
                         PresetRow(stringResource(R.string.app_app_settings), stringResource(R.string.app_render_defaults_hint), false) { showSettings = false; showAppSettings = true }
                     },
-                ) { n, w, h, f, sr ->
+                ) { n, w, h, f, sr, fill ->
                     showSettings = false
                     if (n != controller.currentName) controller.renameProject(controller.currentId, n)
-                    if (q == null || w != q.width || h != q.height || kotlin.math.abs(f - controller.snapshot.fps) > 0.001 || sr != q.sampleRate) controller.setSequenceSettings(w, h, f, sr)
+                    if (q == null || w != q.width || h != q.height || kotlin.math.abs(f - controller.snapshot.fps) > 0.001 || sr != q.sampleRate) controller.setSequenceSettings(w, h, f, sr, fill = fill)
                 }
             }
         }
@@ -1507,13 +1516,15 @@ data class LookValues(val exposure: Float, val contrast: Float, val temp: Float,
  * HLG can be made from the grade: some clip is graded, every graded clip ends in OpenDRT ([ClipGrade.hlgReady]) and
  * the timeline has no look (it would work on the HLG code values). Ungraded clips go into the file unconverted.
  */
-fun hlgReadyOf(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): Boolean =
-    hlgWhyNot(grades, look) == null
+fun hlgReadyOf(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look, sdrOk: Boolean = false): Boolean =
+    hlgWhyNot(grades, look, sdrOk) == null
 
 /** Why HLG can't be made from the grade (null = it can) – shown under the export's color choices. */
-fun hlgWhyNot(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look): String? {
+fun hlgWhyNot(grades: Collection<se.gendut.klipp.engine.ClipGrade>, look: se.gendut.klipp.engine.Look, sdrOk: Boolean = false): String? {
     if (!se.gendut.klipp.engine.EncoderCaps.hdrSupported) return "no HEVC encoder for HDR on this phone"
     if (!look.isNeutral) return "the timeline has a look (Look tab) – it would work on the HLG values"
+    // Klipp Lab: SDR grades allowed (ExportSettings.sdrHlg): the clips not ending in OpenDRT are converted (BT.2408)
+    if (sdrOk) return null
     val graded = grades.filter { g -> g.chain.any { !it.isNeutral } }
     if (graded.isEmpty()) return "no clip is graded – add an OpenDRT node to the clips"
     val bad = graded.count { !it.hlgReady }

@@ -33,10 +33,18 @@ permissions:
 jobs:
   android:
     name: Klipp Lab APK and tests
-    runs-on: ubuntu-latest
+    # Repository variable RUNNER=self-hosted sends the job to the self-hosted runner (mini PC, WSL2); delete the
+    # variable to go back to GitHub's runners. Pull requests always use GitHub's runners.
+    runs-on: ${{ github.event_name != 'pull_request' && vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 120
     steps:
+      # shows where the build runs: "Runner: dragon-klipp-lab-dev" on the mini PC, "Runner: GitHub Actions …" otherwise
+      - name: "Runner: ${{ runner.name }}"
+        run: echo "### Runner \`$RUNNER_NAME\` - $(nproc) CPUs, $(free -g | awk '/^Mem:/{print $2}') GB RAM" >> "$GITHUB_STEP_SUMMARY"
+      # self-hosted: keep the previous checkout's build outputs (incremental Gradle, CMake and cargo builds)
       - uses: actions/checkout@v5
+        with:
+          clean: ${{ vars.RUNNER != 'self-hosted' }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -45,8 +53,10 @@ jobs:
         with:
           packages: platform-tools
       # the NDK and CMake (~1.5 GB) from the cache after the first run
+      # (GitHub's runners only: the self-hosted runner keeps its SDK, NDK and CMake on disk)
       - uses: actions/cache@v4
         id: ndk
+        if: vars.RUNNER != 'self-hosted'
         with:
           path: |
             /usr/local/lib/android/sdk/ndk/29.0.14206865
@@ -58,7 +68,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
+      # (GitHub's runners only: on the self-hosted runner rust/target stays in the kept checkout)
       - uses: Swatinem/rust-cache@v2
+        if: vars.RUNNER != 'self-hosted'
         with:
           workspaces: rust
       # a prebuilt cargo-ndk (seconds instead of compiling it every run)
@@ -75,9 +87,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: false
+          # self-hosted: no GitHub cache, the Gradle home (and its build cache) stays on the runner
+          cache-disabled: ${{ vars.RUNNER == 'self-hosted' }}
       # compiler cache for whisper.cpp (CMake): Gradle's build cache doesn't keep native builds, unchanged files aren't
       # rebuilt (as in Rawr 17U)
+      # (GitHub's runners only: ccache is installed on the self-hosted runner and its directory stays there)
       - uses: hendrikmuhs/ccache-action@v1.2
+        if: vars.RUNNER != 'self-hosted'
         with:
           key: klipp-native-arm64
           max-size: 1G
@@ -124,7 +140,8 @@ jobs:
           CCACHE_NOHASHDIR: "true"
         run: |
           ./gradlew --build-cache assembleRelease
-          mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/klipp17u-${{ steps.ver.outputs.version }}.apk"
+          # kept checkout: out/ must hold only this build's APK (the next steps copy out/*.apk)
+          rm -rf out && mkdir -p out && cp app/build/outputs/apk/release/app-release.apk "out/klipp17u-${{ steps.ver.outputs.version }}.apk"
       # (a private repository – the test builds' – has a small artifact quota: its APK goes to a prerelease instead)
       - uses: actions/upload-artifact@v7
         if: ${{ !github.event.repository.private }}
@@ -135,14 +152,14 @@ jobs:
       # Klipp Lab: in the private test repository the APK is the `test-build` prerelease (release files don't count
       # against the artifact quota); klipp-build.ps1 downloads it from there when the release is of this commit
       - name: Test build prerelease (private repository)
-        if: github.event.repository.private && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/test/')
+        if: github.event.repository.private && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/test/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp out/*.apk klipp17u-test.apk
           gh release delete test-build --cleanup-tag --yes || true
           gh release create test-build klipp17u-test.apk --prerelease --target "$GITHUB_SHA" \
-            --title "Test build" --notes "CI build of ${GITHUB_SHA} (${{ steps.ver.outputs.version }}), branch ${GITHUB_REF_NAME}."
+            --title "Test build" --notes "CI build of ${GITHUB_SHA} (${{ steps.ver.outputs.version }}), branch ${GITHUB_REF_NAME}, on ${RUNNER_NAME}."
       # the tests on debug: the Compose test rule needs debug's test activity (ui-test-manifest is debug only)
       - name: Unit tests (OpenDRT, export plan)
         # (on a test/ branch only with [tests] in the commit message: they compile the whole app again for debug, ~3 min,

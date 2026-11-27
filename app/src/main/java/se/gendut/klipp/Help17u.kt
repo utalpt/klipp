@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -201,6 +202,10 @@ object Help17uText {
         "highlights stay white), and the live one goes back to As shot. " +
         "The clip switches to the new develop when it is done and keeps its grade; its input and OpenDRT nodes follow " +
         "the new curve. The old develop is removed when no project uses it."
+    const val ROT = "How the selected RAW clips stand. Auto: as MotionCam noted it - the phone's position while " +
+        "shooting, or the orientation locked with MotionCam's Lock orientation. Select clips, then pick a turn " +
+        "(clockwise; 180° for a clip upside down) to change them: only the clips selected change, each keeps its own " +
+        "turn, also for the develops that follow."
     const val QUICK = "On: each clip is first developed at half size (about twice as fast, no demosaic), so you can edit " +
         "at once; the full develop follows in the background, one clip at a time, and takes the draft's place when done " +
         "(the progress shows in the clip's RAW settings). Export waits until every clip is full size. Off: the full develop " +
@@ -213,7 +218,10 @@ object Help17uText {
     const val TINT = "Green (−) to magenta (+), in the linear light before the nodes. Double tap: back to 0."
 }
 
-/** Klipp Lab: Settings → Grading for beginners – the fundamental steps, from log footage to a finished image. */
+/**
+ * Klipp Lab: Settings → Grading for beginners – the fundamental steps, from log footage to a finished image, in tabs
+ * (Steps, Film, LUTs, Tips) so the page stays short as it grows.
+ */
 @Composable
 fun Grading17uGuide() {
     val steps = listOf(
@@ -231,13 +239,27 @@ fun Grading17uGuide() {
             "picture, mix 100 %. Its Looks (Arriba, Sylvan, Colorful…) give a style without a LUT.",
         "5 · Export" to
             "SDR or HLG – the same nodes work for both. For HLG, MotionCam clips get OpenDRT on their own if they lack it.",
+    )
+    val film = listOf(
+        "Whole film or Effects only" to
+            "Whole film makes the whole look (the film's and paper's colours and contrast, with grain, halation and " +
+            "diffusion): it is the last rendering, so no OpenDRT with or after it, and the export is SDR. Effects only " +
+            "adds just the grain, halation, diffusion and sharpness to your own grade: OpenDRT keeps the colours and " +
+            "you can export HLG / Dolby Vision.",
+    )
+    val luts = listOf(
         "Careful with LUTs" to
             "A LUT that converts log to Rec.709 does OpenDRT's job: both together convert twice (too much contrast and " +
             "colour). Test a LUT alone: if the flat picture turns 'normal', it's a conversion LUT – use it instead of " +
             "OpenDRT, not with it (SDR only).",
-        "Tip" to "Hold any control for a moment to see what it does.",
     )
-    for ((title, text) in steps) {
+    val tips = listOf(
+        "Hold to see" to "Hold any control for a moment to see what it does.",
+    )
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    ConnectedToggleGroup(listOf("Steps", "Film", "LUTs", "Tips"), tab, { tab = it },
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), height = 40.dp, tag = { "grading:tab$it" })
+    for ((title, text) in listOf(steps, film, luts, tips)[tab]) {
         androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(title, color = K.OnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Text(text, color = K.OnSurfaceVar, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 2.dp))

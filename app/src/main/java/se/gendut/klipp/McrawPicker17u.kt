@@ -73,6 +73,20 @@ object McrawFolder17u {
     fun eiLabel(v: Int) = if (v <= 0) "Auto" else "$v"
     /** The output the files are developed into (an OpenDrt.Input key; S-Log3 / S-Gamut3.Cine by default). */
     fun out(c: Context): String = p(c).getString("out", null) ?: se.gendut.klipp.engine.OpenDrt.Input.SLOG3.key
+
+    /**
+     * Klipp Lab: a file's turn, chosen in the picker for the clips selected: Auto (MotionCam's own "orientation", see
+     * Mcraw.rotationOf) or 0 / 90 / 180 / 270 (clockwise). With MotionCam's "Lock orientation" on, the file holds the
+     * orientation locked. Kept per file: the placeholder and every develop of it use it.
+     */
+    val ROTS = listOf(-1, 0, 90, 180, 270)
+    fun rotLabel(v: Int) = if (v < 0) "Auto" else "$v°"
+    /** The turn chosen for this file, null = Auto. */
+    fun rotFor(c: Context, src: Uri): Int? = p(c).getInt("rot:$src", -1).takeIf { it >= 0 }
+    /** Sets [src]'s turn ([r] < 0: Auto). */
+    fun setRotFor(c: Context, src: Uri, r: Int) {
+        p(c).edit().apply { if (r >= 0) putInt("rot:$src", r) else remove("rot:$src") }.apply()
+    }
     fun setOut(c: Context, k: String) { p(c).edit().putString("out", k).apply() }
 
     /** [dng]: a folder of DNG frames (PhotonCamera's raw video, CinemaDNG), see DngSeq17u. */
@@ -136,6 +150,21 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onList: (List<Uri>) -> Unit = {
             items(McrawFolder17u.EIS) { v -> ToggleChip(McrawFolder17u.eiLabel(v), ei == v, { ei = v; McrawFolder17u.setEi(ctx, v) }, Modifier.testTag("mcraw:ei$v"), help = "Develop at EI" to Help17uText.EI) }
         }
     }
+    // the turn of each file (a change shows at once on its card); the chips set it for the clips selected only
+    val rots = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
+    fun rotOf(u: Uri): Int = rots[u.toString()] ?: McrawFolder17u.rotFor(ctx, u) ?: -1
+    val shownRot = picked.map { rotOf(it) }.distinct().singleOrNull()
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Rotation", color = K.OnSurfaceVar, fontSize = 13.sp, modifier = Modifier.help17u("Rotation", Help17uText.ROT).padding(end = 8.dp))
+        if (picked.isEmpty()) Text("select clips to turn them", color = K.OnSurfaceVar, fontSize = 12.sp)
+        else LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(McrawFolder17u.ROTS) { v ->
+                ToggleChip(McrawFolder17u.rotLabel(v), shownRot == v, {
+                    picked.forEach { u -> McrawFolder17u.setRotFor(ctx, u, v); rots[u.toString()] = v }
+                }, Modifier.testTag("mcraw:rot$v"), help = "Rotation" to Help17uText.ROT)
+            }
+        }
+    }
     var quick by remember { mutableStateOf(McrawFolder17u.quick(ctx)) }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         ToggleChip("Quick import", quick, { quick = !quick; McrawFolder17u.setQuick(ctx, quick) }, Modifier.testTag("mcraw:quick"),
@@ -166,7 +195,7 @@ fun ColumnScope.McrawPanel17u(picked: List<Uri>, onList: (List<Uri>) -> Unit = {
             GridCells.Adaptive(150.dp), Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(list, key = { it.uri.toString() }) { f -> McrawCard(f, picked.indexOf(f.uri) + 1) { onToggle(f.uri) } }
+            items(list, key = { it.uri.toString() }) { f -> McrawCard(f, picked.indexOf(f.uri) + 1, rotOf(f.uri)) { onToggle(f.uri) } }
         }
     }
 }
@@ -177,7 +206,7 @@ private object McrawThumbs {
 }
 
 @Composable
-private fun McrawCard(f: McrawFolder17u.File, order: Int, onClick: () -> Unit) {
+private fun McrawCard(f: McrawFolder17u.File, order: Int, rotSet: Int, onClick: () -> Unit) {
     val ctx = LocalContext.current
     val key = f.uri.toString()
     val thumb = McrawThumbs.cache[key]
@@ -193,7 +222,16 @@ private fun McrawCard(f: McrawFolder17u.File, order: Int, onClick: () -> Unit) {
             .clickable(onClick = onClick).testTag("mcraw:${f.name}")
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(K.Bg)) {
-            thumb?.bitmap?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentScale = ContentScale.Crop) }
+            // Klipp Lab: turned as the clip was shot (a clip shot with the phone turned round showed upside down)
+            // (or as set in Rotation)
+            val turn = if (rotSet >= 0) rotSet else thumb?.rotation ?: 0
+            val shown = androidx.compose.runtime.remember(thumb, turn) {
+                thumb?.bitmap?.let { b ->
+                    if (turn == 0) b
+                    else android.graphics.Bitmap.createBitmap(b, 0, 0, b.width, b.height, android.graphics.Matrix().apply { postRotate(turn.toFloat()) }, true)
+                }
+            }
+            shown?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentScale = ContentScale.Crop) }
             thumb?.let {
                 Text(
                     durText(it.seconds), color = K.OnSurface, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
@@ -209,7 +247,7 @@ private fun McrawCard(f: McrawFolder17u.File, order: Int, onClick: () -> Unit) {
         }
         Text(f.name, color = K.OnSurface, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp))
         val meta = listOfNotNull(
-            thumb?.let { "${it.width}×${it.height} · ${"%.0f".format(it.fps)} fps" },
+            thumb?.let { if ((if (rotSet >= 0) rotSet else it.rotation) % 180 != 0) "${it.height}×${it.width} · ${"%.0f".format(it.fps)} fps" else "${it.width}×${it.height} · ${"%.0f".format(it.fps)} fps" },
             "%.1f GB".format(f.bytes / 1e9),
             android.text.format.DateFormat.format("d MMM HH:mm", f.time).toString(),
         ).joinToString(" · ")

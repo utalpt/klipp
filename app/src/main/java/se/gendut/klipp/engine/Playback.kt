@@ -1415,10 +1415,25 @@ object Exporter {
         lastResult = null
         // separate effect chains for the export (released when it is done)
         val fx = FxRegistry()
+        // Klipp Lab: the film's stage times during the export (every 15th frame), to film_times.txt
+        val sums = java.util.concurrent.ConcurrentHashMap<String, DoubleArray>()
+        val filmProf: (String, Double) -> Unit = { st, ms -> sums.getOrPut(st) { DoubleArray(2) }.let { synchronized(it) { it[0] += ms; it[1] += 1.0 } } }
+        val before = FilmGl.profile; val beforeEvery = FilmGl.profileEvery
+        FilmGl.profile = filmProf; FilmGl.profileEvery = 15
+        val t0 = System.nanoTime()
         try {
             return exportWith(context, s, uriOf, name, look, master, grades, fx, settings, onProgress)
         } finally {
+            if (FilmGl.profile === filmProf) { FilmGl.profile = before; FilmGl.profileEvery = beforeEvery }
             fx.free(fx.takeAll())
+            if (sums.isNotEmpty()) runCatching {
+                val per = sums.mapValues { (_, v) -> v[0] / v[1] }
+                val frames = sums.values.maxOf { it[1] }.toInt()
+                java.io.File(context.getExternalFilesDir(null), "film_times.txt").appendText(
+                    "${java.time.LocalDateTime.now().withNano(0)} export $name ${PassTimes.size ?: "${settings.height}p"}: %.1f s, film %.1f ms/frame (%d frames measured)\n".format(
+                        java.util.Locale.ROOT, (System.nanoTime() - t0) / 1e9, per.values.sum(), frames) +
+                        per.entries.sortedByDescending { it.value }.joinToString("") { (k, v) -> "  %-12s %6.1f ms\n".format(java.util.Locale.ROOT, k, v) })
+            }
         }
     }
 
@@ -1559,6 +1574,8 @@ object Exporter {
         // stays and the export counts as saved even if a cancel comes after (ExportGuard knows – ExportJobs says it)
         return withContext(Dispatchers.IO) {
             val job = coroutineContext[kotlinx.coroutines.Job]
+            // Klipp Lab: the export's own date instead of the first clip's (Export settings › File date)
+            if (st.exportDate) runCatching { Mp4Date.setNow(out) }.onFailure { se.gendut.klipp.CrashReport.note("export date: ${it.message}") }
             runCatching { saveToMovies(context, out, name) { job?.isActive == false } }
         }
     }

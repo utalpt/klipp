@@ -37,6 +37,8 @@ suspend fun importMcraw17u(ctx: Context, picked: List<Uri>,
     try { return importAll(ctx, picked, names, gpuCraw, dngSeq, craw, onEach, status) } finally {
         store.importing = false
         if (store.drafts == 0) se.gendut.klipp.engine.Proxies.hold(false)
+        // (a placeholder left by a develop that failed: tried again now)
+        withContext(Dispatchers.Main) { store.kick?.invoke() }
     }
 }
 
@@ -56,7 +58,12 @@ private suspend fun importAll(ctx: Context, picked: List<Uri>, names: List<Strin
     val raw = picked.indices.filter { names[it].endsWith(".mcraw", ignoreCase = true) || dngSeq[it] }
     if (onEach != null && raw.isNotEmpty() && gpuCraw.none { it }) {
         status("Preparing ${raw.size} RAW clip${if (raw.size == 1) "" else "s"}…")
-        val ph = withContext(Dispatchers.IO) { raw.associateWith { i -> se.gendut.klipp.engine.Placeholder17u.make(ctx, picked[i], names[i], McrawFolder17u.quick(ctx)) } }
+        val ph = withContext(Dispatchers.IO) {
+            raw.associateWith { i ->
+                se.gendut.klipp.engine.Placeholder17u.make(ctx, picked[i], names[i], McrawFolder17u.quick(ctx))
+                    ?.also { se.gendut.klipp.engine.McrawStore17u.notePlaceholder(ctx, it, picked[i], names[i], McrawFolder17u.ei(ctx), McrawFolder17u.out(ctx)) }
+            }
+        }
         if (ph.values.all { it != null }) {
             val first = picked.mapIndexed { i, u -> ph[i] ?: u }
             onEach(first)
@@ -76,9 +83,8 @@ private suspend fun importAll(ctx: Context, picked: List<Uri>, names: List<Strin
                 // the placeholder must be in the project before it can be replaced (the import of it runs on its own)
                 var waited = 0
                 while (waited < 20_000 && withContext(Dispatchers.Main) { store.has?.invoke(p) } == false) { kotlinx.coroutines.delay(100); waited += 100 }
-                withContext(Dispatchers.Main) {
-                    if (r.uri != null) store.relink?.invoke(p, r.uri) else store.remove?.invoke(p)
-                }
+                // (not developed: the placeholder stays – it is noted, and developed again once the import is done; Klipp 0.22)
+                if (r.uri != null) withContext(Dispatchers.Main) { store.relink?.invoke(p, r.uri) }
                 if (r.uri == null) { status("$name: ${r.summary}"); kotlinx.coroutines.delay(2500) }
                 if (dngSeq[i] && r.uri != null) {
                     val c = withContext(Dispatchers.IO) { se.gendut.klipp.engine.DngSeq17u.contents(ctx, u) }

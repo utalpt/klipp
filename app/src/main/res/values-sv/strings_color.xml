@@ -271,4 +271,6 @@
     <string name="craw_developing">Framkallar CRAW…</string>
     <string name="craw_developed">CRAW-framkallningen har uppdaterats</string>
     <string name="craw_develop_import">Framkalla och importera</string>
+    <string name="colortools_drt_after_film">En hel film i den här noden eller en tidigare renderar redan bilden för skärmen, så den här OpenDRT hoppas över (den skulle rendera den två gånger). Exporten blir då SDR. Vill du behålla OpenDRT och exportera HLG / Dolby Vision, sätt filmen till Bara effekter.</string>
+    <string name="colortools_film_input_differs">Klippet är inspelat i %1$s: filmen bör läsa det likadant (Input color space), annars blir den platt och blek.</string>
 </resources>

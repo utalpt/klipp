@@ -9,9 +9,101 @@ The fork's priority: log video, above all from George's camera mods for the Xiao
 other log profiles, HLG out); their Dolby Vision video next. All while staying a general video editor for any phone
 and any footage.
 
-## Next release (unreleased)
+## 0.21.0-beta.1-17u.2
 
-Built and tested on the test branch; goes into the next release.
+Based on Klipp 0.21.0-beta.1, with fixes ported from Klipp 0.22.0 (below).
+
+- MotionCam RAW: clips stand as they were shot. MotionCam doesn't turn the RAW, it notes the phone's orientation in
+  each frame; Klipp Lab ignored it, so a clip shot with the phone turned round showed upside down (reported by
+  @kavascript) and a portrait clip lay on its side. The develop and the placeholder are now tagged to be turned (from the
+  frame's "orientation" and the sensor's "sensorOrientation"; the pixels stay as the sensor gives them), and the
+  picker's cards show them turned, with the size as shown (2304×4096 for portrait). Clips imported before keep their
+  old develop - import them again.
+- MotionCam picker: Rotation (Auto · 0° · 90° · 180° · 270°), beside Develop at EI, for the clips selected (each
+  keeps its own turn; the cards show it at once). Auto follows the file - the phone's position, or the orientation
+  locked with MotionCam's Lock orientation; a turn picked here is kept for the clip's placeholder and every develop
+  after it.
+
+From Klipp 0.22.0 by Flabbjaxaren, ported
+- Titles: the size slider reaches the picture's height (it stopped at 400 px, a fifth of a 4K frame), at most the
+  engine's 2000 px; the lower half of the track holds the small sizes (b889af4, f70fcbe).
+- Titles whose text goes past the frame show whole when scaled down (64a5e51).
+- The playhead no longer stays past the film's end after an undo or edit that shortens it (fc8d8f4).
+- APK: the native libraries are stored compressed - a much smaller download; Android unpacks them once at install
+  (6c67ab3).
+
+Film
+- Film (Color page › Film): the films and the print papers as cards, like the LUT browser – each shows the current
+  frame through that film (or paper, over the film chosen), made in the background as the cards come into view and kept
+  for the session; tap to use, hold to see it on the big picture without changing the grade. Grouped negative / slide /
+  cine. Each card's bake time goes to film_previews.txt.
+- MotionCam RAW: fixes from Klipp 0.22.0-beta.1 by Flabbjaxaren, ported back (his port of this fork's develop):
+  develops at their exact size (rounded to 16 lines a half-size 3840×2160 was 1920×1072); frame times always move on;
+  a develop never waits forever for the encoder's end (every frame out is enough; an encoder that stops early fails the
+  develop); a develop that fails keeps its placeholder and is tried again after the import (twice at most);
+  placeholders left behind (the app closed mid-develop) are developed when the project opens; Settings' Clear of the RAW
+  develops asks first.
+- Loop button under the picture (left of the frame steps): at the end, playback starts again from the start.
+- Without loop, playback stops at the end with the playhead back at the start (the picture went black on the last
+  frame).
+- Film: switched on in a node, its input is the clip's log - from the clip's EI input, its OpenDRT node or its
+  MotionCam / CRAW develop, or S-Log3 for a 10-bit clip (the Input (EI) panel's default; a log APV from the camera got
+  Rec.709) - an 8-bit clip stays on Rec.709. A film switched off in Rec.709 comes back on the clip's log.
+- Film cards: their pictures are kept for the session (about 24 MB) - a strip closed and opened again, or the editor
+  reopened, shows them at once while the frame and the rest of the grade are the same (each was baked again before).
+- Project settings › Format: the cinema formats as in the Rawr 17U fork's video crop - 1.43 IMAX, 1.66, 1.85 Flat,
+  1.90 DCI, 2:1 Univisium, 2.20 Todd-AO, 2.39 Scope, 2.76 Ultra Panavision 70, XPan - cut from the clips' own picture
+  (the largest on the timeline; a MotionCam open gate 4096×3072 gives 2.39 at 4096×1712, the whole sensor's width), and
+  any time after the clips are in. A new shape asks Fill the frame
+  (cropped, the cinema crop) or Fit inside (bars).
+- Fix: changing the project's format left each clip at its old position in pixels - off-centre and cut (a 4096×2560
+  project made 2.39 showed the picture low and cut at the bottom, also in the export). A centred clip stays centred, a
+  moved one keeps its offset in proportion, and a fitted or filling clip fits or fills the new frame (from its file's
+  own size, so changing back and forth doesn't add up). Scales set by hand and keyframed clips stay as they are.
+- Landscape split: the dock under the picture follows the split (it stayed at 46 % and lay over the timeline at a
+  narrower picture), and the picture side keeps at least 360 dp - from Klipp 0.22.0-beta.2 by Flabbjaxaren (61b77e7).
+- Export › Color: "SDR grades in HLG (BT.2408)" - a clip graded with a log → Rec.709 LUT (or another SDR look) no longer
+  blocks HLG / Dolby Vision: its picture goes into the HDR file converted after BT.2408 (SDR white at 203 cd/m²), as the
+  ungraded clips and titles already did - HDR-tagged with SDR highlights, so it mixes with OpenDRT clips. MotionCam
+  clips graded with a LUT then keep the LUT as their rendering (no OpenDRT added after it).
+- Color page: a thin scrub bar for the whole timeline under the clip thumbnails (the clips as segments, the playhead):
+  drag or tap to move through the edit; the clip under the playhead becomes the one graded.
+- Export: choice of the file's date, under the file name - the first clip's recording date (as before: the gallery puts
+  the export beside that footage, which looked like a missing file) or the export time (the export comes first).
+- Settings › Grading for beginners: in tabs (Steps, Film, LUTs, Tips) instead of one long page, with a new Film tab:
+  Whole film or Effects only (which one goes with OpenDRT and HDR).
+- A whole film with OpenDRT in the same node or a later one (e.g. node 2 film, node 3 OpenDRT for Dolby Vision): the
+  OpenDRT is left out, with a note in its node (a film in Effects only keeps OpenDRT after it). The film already renders the picture for the display, and OpenDRT read it again as log footage
+  (crushed blacks, clipped red, an HLG export stretched to 1000 nits). With a whole film the export is SDR; HLG /
+  Dolby Vision (OpenDRT) needs the film in Effects only. An HDR export no longer adds a new OpenDRT node to
+  a MotionCam clip with a whole film (it added one at every try).
+- Film grain (the develop stage, the largest at 4K: ~19 ms a frame): the Poisson draws for fewer than 6 crystals use one
+  random number (inversion) instead of one per crystal, and Box-Muller keeps its second normal - the same grain
+  statistics with fewer random numbers and logarithms.
+- Film cards are made two at a time, and the diffusion / format cards from a 640 px frame (768 before): those took
+  0.5-1.5 s each, one after the other.
+- Film: its sliders (exposure, halation, grain…) show on the picture while dragged with the video paused, also over a
+  part already pre-rendered with Render (before, only the player got them, and there it plays the rendered file).
+- Film: the blur pyramids' coarser levels take one pass less per level (a level's last element gets its vertical
+  blur inside the level's sum) - the export spends most of the film's time there.
+- Film: faster preview with a wide diffusion filter / halation - the camera's blurs no longer fall back to two
+  full-resolution passes per element when they have more such elements than one fused pass takes (the preview's
+  smaller image puts more of the weight on them); they now go in rounds of fused passes.
+- Fix: the app closing by itself (a native abort in Android's video decoder callbacks, seen on the Xiaomi 17 Ultra with
+  Android 16 while playing or opening a project): the player's decoders now run in synchronous mode, which doesn't
+  use that callback path (Media3, third_party/media3-exoplayer).
+- Film: turned on, its Input color space is the clip's own log curve (the EI chip's input, e.g. S-Log3 / S-Gamut3.Cine
+  for a MotionCam develop) instead of always Rec.709; when the two differ, a note under it says what the clip is.
+- Film › Camera: the film format (Super 8 … 6×7), the diffusion filters and their strength as cards too, each showing the brightest part of the frame
+  (where a filter shows), made from a bigger frame with the film over all of it.
+- Holding a film card now shows it: the picture shows the grade with that film (as while a control is dragged) until
+  release. Before, only the player got it, and on a part already pre-rendered (Render) the player plays the rendered
+  file, so nothing changed. The film is made ready first; the wait goes to film_previews.txt.
+
+Diagnostics
+- Film's own stages (expose, camera blurs, couplers, develop, grain, print, scan…) in the diagnostics' GPU stages
+  while playing, and after every export with film their average times per frame in film_times.txt (every 15th frame
+  measured) – to see where the film's time goes.
 
 RAW import
 - MotionCam RAW and DNG folders go on the timeline at once: each clip as a placeholder (its middle frame, its length,

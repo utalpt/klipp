@@ -58,6 +58,8 @@ fun ExportOptions(
     hlgReady: Boolean = false,
     /** Why HLG can't be made (shown under the choices). */
     hlgWhyNot: String? = null,
+    /** Klipp Lab: offer "SDR grades in HLG" (some graded clip doesn't end in OpenDRT). */
+    sdrHlgChoice: Boolean = false,
     onChange: (ExportSettings) -> Unit,
 ) {
     // the same plan the export itself follows: what is made, what is refused, what to know
@@ -206,6 +208,13 @@ fun ExportOptions(
         else -> stringResource(R.string.exportui_note_sdr)
     })
     if (!plan.hlg && hlgWhyNot != null) Note("HLG · OpenDRT: $hlgWhyNot")
+    // Klipp Lab: the clips that don't end in OpenDRT (a log → Rec.709 LUT…) converted into the HLG file (BT.2408)
+    if (sdrHlgChoice || s.sdrHlg) {
+        Chips {
+            Choice("SDR grades in HLG (BT.2408)", s.sdrHlg, true, "exp:sdrHlg") { onChange(s.copy(sdrHlg = !s.sdrHlg)) }
+        }
+        Note("Clips whose grade ends in a LUT (log → Rec.709) or another SDR look go into the HLG / Dolby Vision file converted after BT.2408: SDR white at 203 cd/m² (75 % HLG). The file is HDR and mixes with OpenDRT clips, but those clips keep SDR highlights – for real HDR highlights, end the grade in OpenDRT.")
+    }
 
         }
         else -> {
@@ -245,11 +254,14 @@ fun ExportDialog(
     /** Every graded clip ends in OpenDRT (see [ExportOptions]). */
     hlgReady: Boolean = false,
     hlgWhyNot: String? = null,
+    /** Klipp Lab: HLG can be made when SDR grades are converted too (ExportSettings.sdrHlg). */
+    hlgSdrOk: Boolean = false,
     onDismiss: () -> Unit, onExport: (ExportSettings, String) -> Unit,
 ) {
     var s by remember { mutableStateOf(initial) }
     var name by remember { mutableStateOf(defaultName) }
-    val plan = se.gendut.klipp.engine.ExportPlan.resolve(s, seqW, seqH, projectFps, hdrPossible, anyTenBit, hdrBlocked != null, caps, hlgReady)
+    val hlgNow = hlgReady || (s.sdrHlg && hlgSdrOk)
+    val plan = se.gendut.klipp.engine.ExportPlan.resolve(s, seqW, seqH, projectFps, hdrPossible, anyTenBit, hdrBlocked != null, caps, hlgNow)
     val ow = plan.width
     val oh = plan.height
     // the estimate and the summary are for what is actually made (the codec may have been swapped)
@@ -266,7 +278,17 @@ fun ExportDialog(
                 // the same height on every tab, so the dialog stays where it is when the tab changes; the summary is always in view
                 Column(Modifier.weight(1f, fill = false).height(420.dp).verticalScroll(rememberScrollState())) {
                     TextInput(stringResource(R.string.exportui_file_name), name) { name = it.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80) }
-                    ExportOptions(s, seqW, seqH, projectFps, hdrPossible, hdrBlocked, anyTenBit, caps, seconds, hlgReady, hlgWhyNot) { s = it }
+                    // Klipp Lab: the file's date (galleries sort by it) - the first clip's recording date, so the export sits
+                    // beside that footage, or the export's own, so it comes first
+                    // (a short label beside two short chips: "Date: export time" was cut to "Date:" on a phone)
+                    // (a two-way group across the width, as the tabs: a chip's check mark cut "Export time" to "Export")
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text("Date", color = K.OnSurfaceVar, fontSize = 13.sp)
+                        ConnectedToggleGroup(listOf("First clip", "Export time"), if (s.exportDate) 1 else 0, { s = s.copy(exportDate = it == 1) },
+                            Modifier.weight(1f), height = 40.dp, tag = { if (it == 0) "exp:dateOrig" else "exp:dateNow" })
+                    }
+                    ExportOptions(s, seqW, seqH, projectFps, hdrPossible, hdrBlocked, anyTenBit, caps, seconds, hlgNow, if (hlgNow) null else hlgWhyNot, sdrHlgChoice = !hlgReady && hlgSdrOk) { s = it }
                 }
                 Text(
                     "${ow}×$oh · ${stringResource(R.string.exportui_fps_value, fpsLabel(plan.fps))} · ${codecName(plan.effective.codec)}" +

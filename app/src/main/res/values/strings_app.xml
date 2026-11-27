@@ -182,4 +182,5 @@
     <string name="app_net_timeout">The connection timed out</string>
     <string name="app_render_defaults_hint">Rendering automatically, deleting renders, proxies and caches apply to all projects</string>
     <string name="app_clip_volume_keyframe">Clip volume · keyframe at the playhead</string>
+    <string name="app_loop">Loop</string>
 </resources>

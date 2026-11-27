@@ -10,6 +10,13 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object PassTimes {
     @Volatile var enabled = false
+        set(v) {
+            field = v
+            // Klipp Lab: the film's own stages too (expose, camera, couplers, develop, print …), from its GPU timer queries
+            if (v) { if (FilmGl.profile == null) FilmGl.profile = filmStages }
+            else if (FilmGl.profile === filmStages) FilmGl.profile = null
+        }
+    private val filmStages: (String, Double) -> Unit = { stage, ms -> record("film.$stage", ms) }
 
     private class Stat(@Volatile var ms: Double = 0.0, @Volatile var calls: Long = 0)
     private val stats = ConcurrentHashMap<String, Stat>()

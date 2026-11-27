@@ -55,6 +55,16 @@ object FilmGl {
 
     /** Benchmarks only: each stage's GPU time (timer queries; waits for the results after each frame). Null in the app. */
     @Volatile var profile: ((String, Double) -> Unit)? = null
+    /** Klipp Lab: [profile] on every n-th frame only (the export's stage times: each measured frame waits for the GPU). */
+    @Volatile var profileEvery = 1
+    private val profileCount = java.util.concurrent.atomic.AtomicLong()
+    @Volatile private var timerQueries: Boolean? = null
+    /** (on the GL thread) Without the GPU's timer queries nothing is measured – an error there would turn the film off. */
+    internal fun profileNow(): ((String, Double) -> Unit)? {
+        val p = profile ?: return null
+        val ok = timerQueries ?: (android.opengl.GLES20.glGetString(android.opengl.GLES20.GL_EXTENSIONS)?.contains("GL_EXT_disjoint_timer_query") == true).also { timerQueries = it }
+        return p.takeIf { ok && (profileEvery <= 1 || profileCount.getAndIncrement() % profileEvery == 0L) }
+    }
 
     /**
      * The full-resolution blurs of a pyramid in two passes (see [BLUR_H4], [BLUR_V_SUM]) instead of two per element
@@ -244,6 +254,35 @@ void main() {
 """
 
     /**
+     * Klipp Lab: [LEVEL] with each element's vertical Gaussian done here ([uR0]/[uR1] = 0 and a single tap 1 = the
+     * element as it is): a level's last element (the one nothing else starts from) needs only its horizontal image,
+     * so its vertical pass and the level's sum are one pass.
+     */
+    private const val LEVEL_V = HEAD + """
+uniform int uUseUp;
+uniform sampler2D uUp;
+uniform vec2 uUpSize;
+uniform int uN;
+uniform sampler2D uE0;
+uniform sampler2D uE1;
+uniform vec3 uW0;
+uniform vec3 uW1;
+uniform ivec2 uSize;
+uniform int uR0;
+uniform int uR1;
+uniform float uK0[24];
+uniform float uK1[24];
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec3 s = vec3(0.0);
+  if (uUseUp == 1) s = texture(uUp, (vec2(p) + 0.5) * 0.5 / uUpSize).rgb;
+  if (uN > 0) { vec3 v = vec3(0.0); for (int t = 0; t <= 2 * uR0; t++) v += uK0[t] * texelFetch(uE0, reflect2(p + ivec2(0, t - uR0), uSize), 0).rgb; s += uW0 * v; }
+  if (uN > 1) { vec3 v = vec3(0.0); for (int t = 0; t <= 2 * uR1; t++) v += uK1[t] * texelFetch(uE1, reflect2(p + ivec2(0, t - uR1), uSize), 0).rgb; s += uW1 * v; }
+  outColor = vec4(s, 1.0);
+}
+"""
+
+    /**
      * The horizontal Gaussians of up to four elements in one pass (one image per element): the source is read once
      * per tap. Each element's taps sit centered in its array (zeros outside its radius), so every element's sum is
      * exactly the one [BLUR] makes.
@@ -360,14 +399,31 @@ uniform uint uSeed;
 uint st;
 uint pcg(uint v) { uint s = v * 747796405u + 2891336453u; uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u; return (w >> 22u) ^ w; }
 float uni() { st = pcg(st); return (float(st >> 8u) + 0.5) / 16777216.0; }
-float normal() { return sqrt(-2.0 * log(uni())) * cos(6.283185307179586 * uni()); }
+// Klipp Lab: Box-Muller gives two normals per log/sqrt; the second is kept for the next draw (same distribution, half
+// the transcendentals)
+float spare;
+bool hasSpare = false;
+float normal() {
+  if (hasSpare) { hasSpare = false; return spare; }
+  float r = sqrt(-2.0 * log(uni()));
+  float a = 6.283185307179586 * uni();
+  spare = r * sin(a); hasSpare = true;
+  return r * cos(a);
+}
 float poisson(float mu) {
   if (mu <= 0.0) return 0.0;
   if (mu < 6.0) {
-    float l = exp(-mu);
-    float k = 0.0;
+    // Klipp Lab: inversion with one uniform (walking up the cumulative probabilities) instead of one uniform per count
+    // (Knuth's product); the same Poisson distribution with ~mu fewer random draws. The tail past 1e-7 is cut (the
+    // float sum stops growing there)
     float p = uni();
-    for (int i = 0; i < 64; i++) { if (p <= l) break; k += 1.0; p *= uni(); }
+    float pr = exp(-mu);
+    float cdf = pr;
+    float k = 0.0;
+    for (int i = 0; i < 64; i++) {
+      if (p <= cdf || pr < 1e-7) break;
+      k += 1.0; pr *= mu / k; cdf += pr;
+    }
     return k;
   }
   return max(0.0, floor(mu + sqrt(mu) * normal() + 0.5));
@@ -650,6 +706,7 @@ void main() { outColor = texelFetch(uIn, ivec2(gl_FragCoord.xy), 0); }
         private val blurVHalf = Prog(BLUR_V_HALF)
         private val half = Prog(HALF)
         private val level = Prog(LEVEL)
+        private val levelV = Prog(LEVEL_V)
         private val develop1 = Prog(DEVELOP1)
         private val develop2 = Prog(DEVELOP2)
         private val print = Prog(PRINT)
@@ -798,108 +855,139 @@ void main() { outColor = texelFetch(uIn, ivec2(gl_FragCoord.xy), 0); }
             val need = FilmFx.Pyramid.needed(fit)
             val k0 = (0 until fit.count).filter { els[it].k == 0 && used(fit, it) }
             // the coarse chain starts from a full-resolution element's Gaussian (blurred, then halved)
-            val chainParents = els.indices.filter { need[it] && els[it].k > 0 && els[it].decimate && els[els[it].parent].k == 0 }.map { els[it].parent }
-            val hEls = (k0 + chainParents).distinct()
-            if (k0.size > 4 || hEls.size > 4 || hEls.size > maxDraw || pool.size < hEls.size + 1) return null
-            val hTex = HashMap<Int, Tex>()
-            hEls.forEachIndexed { i, e -> hTex[e] = pool[i] }
-            val out = pool[hEls.size]
-            // 1. the horizontal Gaussians, all at once
-            if (hEls.isNotEmpty()) {
-                val r = hEls.maxOf { FilmFx.Pyramid.TAPS[it].size / 2 }
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, mrtFbo)
-                for (i in 0 until 4) GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0 + i, GLES20.GL_TEXTURE_2D, if (i < hEls.size) hTex.getValue(hEls[i]).id else 0, 0)
-                GLES30.glDrawBuffers(hEls.size, IntArray(hEls.size) { GLES20.GL_COLOR_ATTACHMENT0 + it }, 0)
-                GLES20.glViewport(0, 0, src.w, src.h)
-                blurH4.use()
-                blurH4.tex("uSrc", GLES20.GL_TEXTURE_2D, src.id)
-                blurH4.i2("uSrcSize", src.w, src.h)
-                blurH4.i1("uR", r)
+            val chainParents = els.indices.filter { need[it] && els[it].k > 0 && els[it].decimate && els[els[it].parent].k == 0 }.map { els[it].parent }.distinct()
+            val hEls = (chainParents + k0).distinct()
+            val one = hEls.size <= minOf(4, maxDraw) && pool.size >= hEls.size + 1
+            // Klipp Lab: more full-resolution elements than one pass takes (the preview's smaller image puts more of a
+            // wide diffusion filter's weight on them) – in rounds of up to [c]: each round's horizontal images, then its
+            // vertical sum on the previous round's result (the first round adds the image and the coarser sum). Before,
+            // this fell back to [pyramidSplit]: two full-resolution passes per element
+            val c = if (one) hEls.size else minOf(4, maxDraw, pool.size - 2)
+            if (!one && (c < 1 || chainParents.size > c)) return null
+            val rounds = if (hEls.isEmpty()) listOf(emptyList<Int>()) else hEls.chunked(c.coerceAtLeast(1))
+            val outs = if (one) listOf(pool[hEls.size]) else listOf(pool[c], pool[c + 1])
+            var prev = src
+            for ((ri, chunk) in rounds.withIndex()) {
+                val hTex = HashMap<Int, Tex>()
+                chunk.forEachIndexed { i, e -> hTex[e] = pool[i] }
+                // 1. the horizontal Gaussians, all at once
+                if (chunk.isNotEmpty()) {
+                    val r = chunk.maxOf { FilmFx.Pyramid.TAPS[it].size / 2 }
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, mrtFbo)
+                    for (i in 0 until 4) GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0 + i, GLES20.GL_TEXTURE_2D, if (i < chunk.size) hTex.getValue(chunk[i]).id else 0, 0)
+                    GLES30.glDrawBuffers(chunk.size, IntArray(chunk.size) { GLES20.GL_COLOR_ATTACHMENT0 + it }, 0)
+                    GLES20.glViewport(0, 0, src.w, src.h)
+                    blurH4.use()
+                    blurH4.tex("uSrc", GLES20.GL_TEXTURE_2D, src.id)
+                    blurH4.i2("uSrcSize", src.w, src.h)
+                    blurH4.i1("uR", r)
+                    for (i in 0 until 4) {
+                        val a = FloatArray(24)
+                        if (i < chunk.size) { val k = FilmFx.Pyramid.TAPS[chunk[i]]; k.copyInto(a, r - k.size / 2) }
+                        blurH4.fv("uK$i", a)
+                    }
+                    draw()
+                    // (back to a single output for the other passes on this framebuffer)
+                    GLES30.glDrawBuffers(1, intArrayOf(GLES20.GL_COLOR_ATTACHMENT0), 0)
+                    subMark?.invoke("$tag:h4")
+                }
+                var acc: Tex? = null
+                if (ri == 0) {
+                    // 2. the coarser levels: the elements (the chain) level by level, as in pyramidSplit – an element
+                    // nothing starts from only gets its horizontal image here (its vertical one is in the level's sum)
+                    val maxK = (0 until fit.count).filter { used(fit, it) }.maxOfOrNull { els[it].k } ?: 0
+                    val parents = els.indices.filter { need[it] }.map { els[it].parent }.toSet()
+                    for (e in els.indices) {
+                        if (!need[e]) continue
+                        val el = els[e]
+                        if (el.k == 0) continue
+                        if (e !in parents && !el.decimate) {
+                            blurPass(lv("${tag}e${els[e].parent}", els[e].parent.let { els[it].k }), lv("${tag}nh$e", el.k), 0, FilmFx.Pyramid.TAPS[e])
+                            continue
+                        }
+                        val parent = el.parent
+                        val pk = els[parent].k
+                        val base: Tex
+                        if (el.decimate) {
+                            base = lv("${tag}half", el.k)
+                            if (pk == 0) {
+                                val h = hTex.getValue(parent)
+                                target(base)
+                                blurVHalf.use()
+                                blurVHalf.tex("uSrc", GLES20.GL_TEXTURE_2D, h.id)
+                                blurVHalf.i2("uSrcSize", h.w, h.h)
+                                taps(blurVHalf, FilmFx.Pyramid.TAPS[parent])
+                                draw()
+                            } else {
+                                val pt = lv("${tag}e$parent", pk)
+                                target(base)
+                                half.use()
+                                half.tex("uSrc", GLES20.GL_TEXTURE_2D, pt.id)
+                                half.i2("uSrcSize", pt.w, pt.h)
+                                draw()
+                            }
+                        } else base = lv("${tag}e$parent", pk)
+                        val t = lv("${tag}tmp", el.k)
+                        val o = lv("${tag}e$e", el.k)
+                        blurPass(base, t, 0, FilmFx.Pyramid.TAPS[e])
+                        blurPass(t, o, 1, FilmFx.Pyramid.TAPS[e])
+                    }
+                    // 3. the coarser sum, bottom-up, as in pyramidSplit
+                    for (k in maxK downTo 1) {
+                        val es = (0 until fit.count).filter { els[it].k == k && used(fit, it) }
+                        val lo = lv("${tag}acc", k)
+                        target(lo)
+                        levelV.use()
+                        levelV.i1("uUseUp", if (acc != null) 1 else 0)
+                        levelV.tex("uUp", GLES20.GL_TEXTURE_2D, (acc ?: lo).id)
+                        levelV.f2("uUpSize", (acc ?: lo).w.toFloat(), (acc ?: lo).h.toFloat())
+                        levelV.i1("uN", es.size)
+                        levelV.i2("uSize", lo.w, lo.h)
+                        for (i in 0 until 2) {
+                            val e = es.getOrNull(i)
+                            val hOnly = e != null && e !in parents && !els[e].decimate
+                            levelV.tex("uE$i", GLES20.GL_TEXTURE_2D, e?.let { lv(if (hOnly) "${tag}nh$it" else "${tag}e$it", k).id } ?: lo.id)
+                            val kk = if (hOnly) FilmFx.Pyramid.TAPS[e!!] else floatArrayOf(1f)
+                            val a = FloatArray(24); kk.copyInto(a)
+                            levelV.i1("uR$i", kk.size / 2)
+                            levelV.fv("uK$i", a)
+                            val wv = e?.let { wOf(fit, it + 1) } ?: floatArrayOf(0f, 0f, 0f)
+                            levelV.f3("uW$i", wv[0], wv[1], wv[2])
+                        }
+                        draw()
+                        acc = lo
+                    }
+                    subMark?.invoke("$tag:coarse")
+                }
+                // 4. full resolution in one pass: this round's elements' vertical Gaussians on the image (first round,
+                // with its weight and the coarser sum) or on the previous round's result (weight 1)
+                val ks = chunk.filter { it in k0 }
+                val out = outs[ri % outs.size]
+                target(out)
+                blurVSum.use()
+                blurVSum.tex("uSrc", GLES20.GL_TEXTURE_2D, prev.id)
+                blurVSum.i2("uSrcSize", src.w, src.h)
+                val w0 = if (ri == 0) wOf(fit, 0) else floatArrayOf(1f, 1f, 1f)
+                blurVSum.f3("uW0", w0[0], w0[1], w0[2])
+                blurVSum.i1("uUseUp", if (acc != null) 1 else 0)
+                blurVSum.tex("uUp", GLES20.GL_TEXTURE_2D, (acc ?: src).id)
+                blurVSum.f2("uUpSize", (acc ?: src).w.toFloat(), (acc ?: src).h.toFloat())
+                blurVSum.i1("uN", ks.size)
                 for (i in 0 until 4) {
-                    val a = FloatArray(24)
-                    if (i < hEls.size) { val k = FilmFx.Pyramid.TAPS[hEls[i]]; k.copyInto(a, r - k.size / 2) }
-                    blurH4.fv("uK$i", a)
+                    val e = ks.getOrNull(i)
+                    blurVSum.tex("uH$i", GLES20.GL_TEXTURE_2D, (e?.let { hTex.getValue(it) } ?: src).id)
+                    val k = e?.let { FilmFx.Pyramid.TAPS[it] } ?: floatArrayOf(1f)
+                    val a = FloatArray(24); k.copyInto(a)
+                    blurVSum.i1("uR$i", k.size / 2)
+                    blurVSum.fv("uK$i", a)
+                    val wv = e?.let { wOf(fit, it + 1) } ?: floatArrayOf(0f, 0f, 0f)
+                    blurVSum.f3("uWe$i", wv[0], wv[1], wv[2])
                 }
                 draw()
-                // (back to a single output for the other passes on this framebuffer)
-                GLES30.glDrawBuffers(1, intArrayOf(GLES20.GL_COLOR_ATTACHMENT0), 0)
-                subMark?.invoke("$tag:h4")
+                subMark?.invoke("$tag:vsum")
+                prev = out
             }
-            // 2. the coarser levels: the elements (the chain) level by level, as in pyramidSplit
-            val maxK = (0 until fit.count).filter { used(fit, it) }.maxOfOrNull { els[it].k } ?: 0
-            for (e in els.indices) {
-                if (!need[e]) continue
-                val el = els[e]
-                if (el.k == 0) continue
-                val parent = el.parent
-                val pk = els[parent].k
-                val base: Tex
-                if (el.decimate) {
-                    base = lv("${tag}half", el.k)
-                    if (pk == 0) {
-                        val h = hTex.getValue(parent)
-                        target(base)
-                        blurVHalf.use()
-                        blurVHalf.tex("uSrc", GLES20.GL_TEXTURE_2D, h.id)
-                        blurVHalf.i2("uSrcSize", h.w, h.h)
-                        taps(blurVHalf, FilmFx.Pyramid.TAPS[parent])
-                        draw()
-                    } else {
-                        val pt = lv("${tag}e$parent", pk)
-                        target(base)
-                        half.use()
-                        half.tex("uSrc", GLES20.GL_TEXTURE_2D, pt.id)
-                        half.i2("uSrcSize", pt.w, pt.h)
-                        draw()
-                    }
-                } else base = lv("${tag}e$parent", pk)
-                val t = lv("${tag}tmp", el.k)
-                val o = lv("${tag}e$e", el.k)
-                blurPass(base, t, 0, FilmFx.Pyramid.TAPS[e])
-                blurPass(t, o, 1, FilmFx.Pyramid.TAPS[e])
-            }
-            // 3. the coarser sum, bottom-up, as in pyramidSplit
-            var acc: Tex? = null
-            for (k in maxK downTo 1) {
-                val es = (0 until fit.count).filter { els[it].k == k && used(fit, it) }
-                val lo = lv("${tag}acc", k)
-                target(lo)
-                level.use()
-                level.i1("uUseUp", if (acc != null) 1 else 0)
-                level.tex("uUp", GLES20.GL_TEXTURE_2D, (acc ?: lo).id)
-                level.f2("uUpSize", (acc ?: lo).w.toFloat(), (acc ?: lo).h.toFloat())
-                level.i1("uN", es.size)
-                level.tex("uE0", GLES20.GL_TEXTURE_2D, es.getOrNull(0)?.let { lv("${tag}e$it", k).id } ?: lo.id)
-                level.tex("uE1", GLES20.GL_TEXTURE_2D, es.getOrNull(1)?.let { lv("${tag}e$it", k).id } ?: lo.id)
-                es.getOrNull(0)?.let { val wv = wOf(fit, it + 1); level.f3("uW0", wv[0], wv[1], wv[2]) }
-                es.getOrNull(1)?.let { val wv = wOf(fit, it + 1); level.f3("uW1", wv[0], wv[1], wv[2]) }
-                draw()
-                acc = lo
-            }
-            subMark?.invoke("$tag:coarse")
-            // 4. full resolution in one pass
-            target(out)
-            blurVSum.use()
-            blurVSum.tex("uSrc", GLES20.GL_TEXTURE_2D, src.id)
-            blurVSum.i2("uSrcSize", src.w, src.h)
-            val w0 = wOf(fit, 0); blurVSum.f3("uW0", w0[0], w0[1], w0[2])
-            blurVSum.i1("uUseUp", if (acc != null) 1 else 0)
-            blurVSum.tex("uUp", GLES20.GL_TEXTURE_2D, (acc ?: src).id)
-            blurVSum.f2("uUpSize", (acc ?: src).w.toFloat(), (acc ?: src).h.toFloat())
-            blurVSum.i1("uN", k0.size)
-            for (i in 0 until 4) {
-                val e = k0.getOrNull(i)
-                blurVSum.tex("uH$i", GLES20.GL_TEXTURE_2D, (e?.let { hTex.getValue(it) } ?: src).id)
-                val k = e?.let { FilmFx.Pyramid.TAPS[it] } ?: floatArrayOf(1f)
-                val a = FloatArray(24); k.copyInto(a)
-                blurVSum.i1("uR$i", k.size / 2)
-                blurVSum.fv("uK$i", a)
-                val wv = e?.let { wOf(fit, it + 1) } ?: floatArrayOf(0f, 0f, 0f)
-                blurVSum.f3("uWe$i", wv[0], wv[1], wv[2])
-            }
-            draw()
-            subMark?.invoke("$tag:vsum")
-            return out
+            return prev
         }
 
         /** The kernel [fit] on [src] one pass per element (the original order, see [pyramidFused]). */
@@ -1051,7 +1139,7 @@ void main() { outColor = texelFetch(uIn, ivec2(gl_FragCoord.xy), 0); }
                 val fr = frame!!
                 val s = setup
                 // benchmarks: each stage's GPU time from timer queries (no glFinish – it would let the clock drop)
-                val prof = profile
+                val prof = profileNow()
                 val marks = ArrayList<Pair<String, Int>>()
                 fun newQuery(): Int { val q = IntArray(1); GLES30.glGenQueries(1, q, 0); GLES30.glBeginQuery(GL_TIME_ELAPSED, q[0]); return q[0] }
                 var q0 = if (prof != null) newQuery() else 0

@@ -113,7 +113,7 @@ android {
     // Klipp Lab (fork utalpt/klipp, branch xiaomi-17u): its own app id and name, installed beside Klipp. The version is
     // Klipp's plus the fork's release number N: versionName <Klipp's>-17u.N, versionCode <Klipp's> * 100 + N (as in Rawr
     // 17U). Kept in this one block so Klipp's own lines merge unchanged.
-    val klipp17u = 1
+    val klipp17u = 2
     defaultConfig {
         applicationId = "x17u.klipp.editor"
         versionCode = versionCode!! * 100 + klipp17u
@@ -124,6 +124,10 @@ android {
         // cargo ndk also copies DeepFilterNet's own cdylib (libdf-<hash>.so) into jniLibs; its code is linked into
         // libklipp_bridge.so already and nothing loads it
         jniLibs.excludes += "**/libdf-*.so"
+        // From Klipp 0.22.0 by Flabbjaxaren (6c67ab3):
+        // the native libraries go into the APK compressed (~104 → ~46 MB): the download is about 55 MB smaller, and
+        // Android unpacks them once at install instead of running them straight from the APK
+        jniLibs.useLegacyPackaging = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

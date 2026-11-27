@@ -60,6 +60,8 @@ object Ic {
     val Pause = filled("pause", "M7 5h4v14H7zM13 5h4v14h-4z")
     val Prev = stroke("prev", "M17 6l-7 6 7 6", "M7 6v12")
     val Next = stroke("next", "M7 6l7 6-7 6", "M17 6v12")
+    /** Klipp Lab: two arrows round a loop – playback starts again at the start. */
+    val Loop = stroke("loop", "M17 2l4 4-4 4", "M3 11V9a3 3 0 0 1 3-3h15", "M7 22l-4-4 4-4", "M21 13v2a3 3 0 0 1-3 3H3")
     val MarkIn = shifted("in", 4.5f, 0f, "M9 4H6v16h3")
     val MarkOut = shifted("out", -4.5f, 0f, "M15 4h3v16h-3")
     val Select = shifted("select", 0f, 1f, "M5 3l14 8-6 2-3 6z")

@@ -73,6 +73,8 @@ import se.gendut.klipp.engine.Placement
 import se.gendut.klipp.engine.TextSnap
 import se.gendut.klipp.engine.TitleAnim
 import se.gendut.klipp.engine.TitleArt
+import se.gendut.klipp.engine.inArt
+import androidx.compose.ui.graphics.asAndroidBitmap
 import se.gendut.klipp.engine.TitleLook
 import se.gendut.klipp.engine.TitlePlate
 import se.gendut.klipp.engine.TitleShadow
@@ -85,8 +87,10 @@ import kotlin.math.roundToInt
  * (bgX, bgY) in the frame, scaled and rotated around it. [frameW]×[frameH] = the program frame's size in pixels;
  * the image is drawn at the same scale.
  */
-fun DrawScope.drawPlaced(img: ImageBitmap, p: Placement, frameW: Int, frameH: Int) {
-    if (p.alpha < 0.003f) return
+fun DrawScope.drawPlaced(img: ImageBitmap, p0: Placement, frameW: Int, frameH: Int) {
+    if (p0.alpha < 0.003f) return
+    // a title drawn larger than the frame (its text goes past it): placed by that region
+    val p = p0.inArt(se.gendut.klipp.engine.TitleArt.regionOf(img.asAndroidBitmap()))
     val k = size.width / frameW
     val ow = img.width * k
     val oh = img.height * k
@@ -138,6 +142,16 @@ fun sizeFor(t: TitleTemplate, h: Int): Double = h * when (t) {
     TitleTemplate.LOWER_THIRD -> 0.062; TitleTemplate.CHAPTER -> 0.085; TitleTemplate.ROLL -> 0.05; TitleTemplate.FREE -> 0.09
 }
 
+// From Klipp 0.22.0 by Flabbjaxaren (b889af4, f70fcbe): the title size reaches the picture's height, at most the engine's 2000 px
+/** The engine's largest title size (its graphic_text `size` range is 1–2000). */
+const val TITLE_SIZE_ENGINE_MAX = 2000f
+
+/**
+ * The size slider's top: as tall as the picture (at least 400 px, the old top) – a word can fill the frame – but no
+ * more than the engine takes (a 4K frame: 2000 of 2160 px).
+ */
+fun titleSizeMax(seqH: Int): Float = seqH.toFloat().coerceIn(400f, TITLE_SIZE_ENGINE_MAX)
+
 /** The title as it enters the frame – plays in a loop. */
 @Composable
 fun TitlePreview(look: TitleLook, text: String, modifier: Modifier = Modifier, color: Int = 0xFFFFFF, playing: Boolean = true, replayKey: Any? = null) {
@@ -147,7 +161,7 @@ fun TitlePreview(look: TitleLook, text: String, modifier: Modifier = Modifier, c
         TextSnap(text.ifBlank { sampleText(look.template) }, sizeFor(look.template, fh), null, null,
             listOf(((color shr 16) and 255) / 255f, ((color shr 8) and 255) / 255f, (color and 255) / 255f, 1f), look.encode())
     }
-    val img = remember(snap) { runCatching { TitleArt.draw(snap, fw, fh).asImageBitmap() }.getOrNull() }
+    val img = remember(snap) { runCatching { TitleArt.drawRegion(snap, fw, fh).asImageBitmap() }.getOrNull() }
     val dur = if (look.template == TitleTemplate.ROLL) 6.0 else 3.0
     var t by remember { mutableFloatStateOf(if (playing) 0f else 1.2f) }
     // the loop only plays while the box is visible on screen (not when the panel is scrolled away or on the
@@ -524,7 +538,7 @@ fun TitleSection(state: EditorState, p: ClipProps, backend: PropsBackend, tab: I
             // the text's look: size, color, its own opacity, font, weight, spacing
             PanelCard(Modifier.padding(top = 10.dp)) {
             PropSlider(
-                stringResource(R.string.titleui_size), p.textSize, 8f, 400f, sizeFor(look.template, p.seqH).roundToInt().toFloat(), { "%.0f px".format(it) }, "size",
+                stringResource(R.string.titleui_size), p.textSize, 8f, titleSizeMax(p.seqH), sizeFor(look.template, p.seqH).roundToInt().toFloat(), { "%.0f px".format(it) }, "size", curve = 2f,
                 onLive = { v -> state.setLive((state.live?.takeIf { it.id == p.id } ?: p).copy(textSize = v)) },
             ) { backend.setTitle(p.id, size = it); scope.launch { state.endLive() } }
             SectionLabel(stringResource(R.string.titleui_text_color))

@@ -186,7 +186,19 @@ public final class DefaultMediaCodecAdapterFactory implements MediaCodecAdapter.
     return new SynchronousMediaCodecAdapter.Factory().createAdapter(configuration);
   }
 
+  /**
+   * Klipp Lab: the default mode uses the synchronous adapter. On Android 16 (Xiaomi 17 Ultra, QTI SM8850) the
+   * asynchronous one aborted the app natively: the framework's callback thread ("MediaCodec_loop") converting a
+   * callback's message to a map hit CHECK(msg->findInt32(key, &val)) in android_media_Streams.cpp while the player's
+   * thread was calling the same codec (releaseOutputBuffer, setVideoScalingMode). The synchronous adapter sets no
+   * callback, so that path isn't used. Set false to go back to Media3's choice.
+   */
+  public static volatile boolean klippSynchronousByDefault = true;
+
   private boolean shouldUseAsynchronousAdapterInDefaultMode() {
+    if (klippSynchronousByDefault) {
+      return false;
+    }
     if (SDK_INT >= 31) {
       // Asynchronous codec interactions started to be reliable for all devices on API 31+.
       return true;

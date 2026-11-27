@@ -50,10 +50,20 @@ data class ExportSettings(
      * lists 160 Mbit/s and takes 200-240) – see KlippEncoderLimits.
      */
     val uncapped: Boolean = true,
+    /**
+     * Klipp Lab: the file's date (the one galleries sort by) is the export's - it comes first in the gallery. Off: the
+     * first clip's recording date, as Media3 copies it (the export sits beside the original footage).
+     */
+    val exportDate: Boolean = false,
+    /**
+     * Klipp Lab: HLG / Dolby Vision also when a graded clip doesn't end in OpenDRT (e.g. a log → Rec.709 LUT): its SDR
+     * picture goes into the HLG file after BT.2408 (SDR white at 203 cd/m², 75 % HLG) - HDR-tagged, SDR highlights.
+     */
+    val sdrHlg: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().put("h", height).put("fps", fps).put("codec", codec).put("mbps", bitrateMbps.toDouble())
         .put("cbr", cbr).put("key", keyframeSec.toDouble()).put("high", highProfile).put("hdr", hdr)
-        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg).put("dv", dolby).put("uncap", uncapped)
+        .put("audio", audio).put("akbps", audioKbps).put("sr", sampleRate).put("mono", mono).put("bits", bitDepth).put("hlg", hlg).put("dv", dolby).put("uncap", uncapped).put("now", exportDate).put("sdrHlg", sdrHlg)
 
     /** Output frame size for a [w]×[h] project (even dimensions, as encoders require). */
     fun outputSize(w: Int, h: Int): Pair<Int, Int> {
@@ -100,6 +110,8 @@ data class ExportSettings(
                 o.optBoolean("hlg", false),
                 o.optBoolean("dv", false),
                 o.optBoolean("uncap", true),
+                o.optBoolean("now", false),
+                o.optBoolean("sdrHlg", false),
             )
         }
 

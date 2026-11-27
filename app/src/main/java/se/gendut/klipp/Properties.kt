@@ -103,6 +103,8 @@ fun PropSlider(
     lane: Boolean = true,
     /** The track's color: on a surface of the track's own color (a menu) another one, or the track can't be seen. */
     trackColor: Color = K.SurfaceHighest,
+    /** The track's shape: 1 = even; 2 = the lower part of the range gets more of the track (a wide range like text size). From Klipp 0.22.0 by Flabbjaxaren (b889af4). */
+    curve: Float = 1f,
     onCommit: (Float) -> Unit,
 ) {
     val haptics = rememberHaptics()
@@ -134,7 +136,7 @@ fun PropSlider(
         }
         Box(
             Modifier.fillMaxWidth().height(44.dp).testTag("prop:$tag")
-                .pointerInput(min, max, default) {
+                .pointerInput(min, max, default, curve) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         // the value when the gesture started: live values can be fed back into [value] during the drag
@@ -144,7 +146,7 @@ fun PropSlider(
                         var moved = false
                         var cancelled = false
                         fun valueAt(x: Float): Float {
-                            val nv = min + (x / size.width).coerceIn(0f, 1f) * (max - min)
+                            val nv = min + Math.pow((x / size.width).coerceIn(0f, 1f).toDouble(), curve.toDouble()).toFloat() * (max - min)
                             val s = kotlin.math.sign(nv - default)
                             if (s != side) { if (side != 0f || s == 0f) haptics.tick(); side = s }
                             return nv
@@ -192,7 +194,7 @@ fun PropSlider(
             Canvas(Modifier.fillMaxWidth().height(44.dp)) {
                 val h = 16.dp.toPx()
                 val top = (size.height - h) / 2
-                fun xOf(f: Float) = ((f - min) / (max - min)).coerceIn(0f, 1f) * size.width
+                fun xOf(f: Float) = Math.pow(((f - min) / (max - min)).coerceIn(0f, 1f).toDouble(), 1.0 / curve).toFloat() * size.width
                 val x = xOf(v.value)
                 val x0 = xOf(default.coerceIn(min, max))
                 val hw = (4f + 2f * grow).dp.toPx()

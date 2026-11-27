@@ -507,6 +507,8 @@ class EditorState(initial: List<Clip> = initialClips()) {
     var editView by mutableStateOf(EditView.TIMELINE)
     var playhead by mutableFloatStateOf(14f)
     var playing by mutableStateOf(false)
+    /** Klipp Lab: at the end, playback starts again from the start. */
+    var loop by mutableStateOf(false)
     var selected by mutableStateOf<Long?>(null)
     /** Track states, V3 V2 V1 A1 A2 A3 (indexed like TRACKS). */
     var trackStates by mutableStateOf(List(TRACKS.size) { TrackState() })

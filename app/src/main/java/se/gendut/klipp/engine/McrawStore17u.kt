@@ -107,6 +107,22 @@ object McrawStore17u {
     @Volatile var has: ((Uri) -> Boolean)? = null
     /** Klipp Lab: takes this file's media out of the open project, with its clips (a placeholder whose develop failed). */
     @Volatile var remove: ((Uri) -> Unit)? = null
+    /** Klipp Lab: develops what the open project still has as quick develops or placeholders (set by the open project). */
+    @Volatile var kick: (() -> Unit)? = null
+
+    /**
+     * Klipp Lab (as in Klipp 0.22, Flabbjaxaren, 22134e9): a placeholder for [src]'s develop at [ei] (≤ 0: Auto) into
+     * [out], noted like a develop – one left behind (the app closed while it was developing, or its develop failed) is
+     * developed when its project is opened again or the import is done.
+     */
+    fun notePlaceholder(c: Context, placeholder: Uri, src: Uri, name: String, ei: Int, out: String) {
+        val f = File(placeholder.path ?: return)
+        if (f.parentFile?.absolutePath != dir(c).absolutePath) return
+        record(c, f, src, name, ei, out, ei <= 0, null)
+    }
+
+    /** How many times a placeholder left behind was developed in this run (two at most: a file that can't be developed isn't tried for good). */
+    private val tries = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     /** The develop running in the background for the RAW settings: "name: 42 %", null = none. */
     var working by androidx.compose.runtime.mutableStateOf<String?>(null)
@@ -177,7 +193,10 @@ object McrawStore17u {
     fun finishDrafts(c: Context, uris: Collection<Uri>) {
         val app = c.applicationContext
         for (u in uris) {
-            if (!isDraft(app, u) || !queued.add(u.toString())) continue
+            // Klipp Lab: also a placeholder no import is developing any more (Klipp 0.22, Flabbjaxaren, 60ef1b9)
+            val left = Placeholder17u.isPlaceholder(u) && !importing && (tries[u.toString()] ?: 0) < 2
+            if (!(isDraft(app, u) || left) || !queued.add(u.toString())) continue
+            if (left) tries[u.toString()] = (tries[u.toString()] ?: 0) + 1
             if (drafts++ == 0) Proxies.hold(true)
             bg.launch {
                 // a moment first: the import that brought the draft in is still adding it to the project

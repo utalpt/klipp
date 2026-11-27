@@ -271,4 +271,6 @@
     <string name="craw_developing">Developing CRAW…</string>
     <string name="craw_developed">CRAW development updated</string>
     <string name="craw_develop_import">Develop and import</string>
+    <string name="colortools_drt_after_film">A whole film in this node or an earlier one already renders the picture for the display, so this OpenDRT is left out (it would render it twice). The export is then SDR. To keep OpenDRT and export HLG / Dolby Vision, set that film to Effects only.</string>
+    <string name="colortools_film_input_differs">The clip is recorded in %1$s: the film should read it the same way (Input color space), or it comes out flat and pale.</string>
 </resources>
