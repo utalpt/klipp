@@ -49,14 +49,6 @@ Its focus: **log video, RAW video and HDR** from phone cameras, graded and expor
 - 🖥️ **Full screen**, three interface sizes, resizable picture in landscape
 
 <details open>
-<summary><b>🧪 Experimental</b></summary>
-
-- **DNG folders:** a folder of DNG frames (CinemaDNG, PhotonCamera's raw video) imports as a clip, with its sound.
-  Uncompressed DNGs only. PhotonCamera's DNG recording drops many frames, so those clips stutter – use its .mcraw.
-
-</details>
-
-<details open>
 <summary><b>🔁 Sent to Klipp and merged</b> (Klipp 0.21.0-beta.2: #4–#10 · Klipp 0.22.0-beta.1: #12, #13)</summary>
 
 - MotionCam RAW import with the GPU develop, ported by Flabbjaxaren (#12)
